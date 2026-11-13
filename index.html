@@ -251,7 +251,8 @@ function demoSave(){ls.set('pc-demo',DEMOD)}
 async function demoCall(a,p){const D=await demoData();const u=ls.get('pc-demo-user',null);
   if(a==='login'){if(String(p.pin).trim()!=='1234')throw new Error('PIN incorreto. No modo demonstração (sem a planilha ligada) o PIN de todos é 1234.');const e=D.equipe.find(x=>x.nome===p.nome);ls.set('pc-demo-user',e);return {ok:true,token:'demo',nome:e.nome,perfil:e.perfil}}
   if(!u)throw new Error('Entre primeiro');
-  if(a==='load'||a==='changes')return {ok:true,eu:u,equipe:D.equipe,listas:D.listas,leads:D.leads,atividade:D.atividade,agora:Date.now()};
+  if(a==='load'||a==='changes'){const LM={};D.listas.forEach(l=>LM[l.id]=l);const g=u.perfil==='Gestão';const vis=D.leads.filter(d=>g||(d.ow||(LM[d.l]||{}).ow||'')===u.nome);const ids=new Set(vis.map(d=>d.l));
+    return {ok:true,eu:u,equipe:D.equipe,listas:D.listas.filter(l=>g||l.ow===u.nome||ids.has(l.id)),leads:vis,ids:a==='changes'?vis.map(d=>d.k):undefined,atividade:D.atividade.filter(x=>g||x.by===u.nome),agora:Date.now()}}
   if(a==='update'){const d=D.leads.find(x=>x.k===p.id);if(!d)throw new Error('Lead não encontrado');const cur=Object.assign({},d);Object.assign(d,p.fields);
     if(('w2' in p.fields&&d.w2&&!cur.w2&&!cur.w)||('w' in p.fields&&d.w&&!cur.w&&!cur.w2&&!cur.wgby)){d.wgby=u.nome;d.wgday=today()}
     let contou=false;if(p.contact&&cur.cd!==today()){d.cd=today();contou=true;if(!d.st||d.st==='Não contatado')d.st='1º contato feito';D.atividade.push({day:today(),by:u.nome,k:d.k,l:d.l,acao:'Contato',st:d.st})}
@@ -273,7 +274,8 @@ function setData(j,full){
   LISTAS={};(j.listas||[]).forEach(x=>LISTAS[x.id]=x);
   if(full){LEADS=j.leads||[];BYK={};LEADS.forEach(d=>BYK[d.k]=d)}
   else{(j.leads||[]).forEach(d=>{if(BYK[d.k])Object.keys(BYK[d.k]).forEach(k=>{if(!(k in d))delete BYK[d.k][k]}),Object.assign(BYK[d.k],d);else{LEADS.push(d);BYK[d.k]=d}})}
-  LEADS=LEADS.filter(d=>LISTAS[d.l]);BYK={};LEADS.forEach(d=>BYK[d.k]=d);
+  const vis=Array.isArray(j.ids)?new Set(j.ids):null;
+  LEADS=LEADS.filter(d=>LISTAS[d.l]&&(!vis||vis.has(d.k)));BYK={};LEADS.forEach(d=>BYK[d.k]=d);
   ACT=j.atividade||ACT;SINCE=j.agora||Date.now();
 }
 const st=d=>d.st||'Não contatado';
@@ -319,7 +321,7 @@ function row(d){const cur=st(d);
     el('div',{class:'ctc c-ctc'},el('span',{class:'mobl',text:'Contato'}),d.c2?el('b',{text:d.c2}):(d.ct||el('span',{class:'sub',text:'—'}))));
   const sel=el('select',{id:'st-'+d.k,'aria-label':'Status'});STS.forEach(x=>sel.append(el('option',{value:x,text:x})));sel.value=cur;sel.onchange=()=>save(d,{st:sel.value},true);
   const fu=el('input',{type:'date',id:'fu-'+d.k,'aria-label':'Próximo follow-up',value:d.fu||''});fu.onchange=()=>save(d,{fu:fu.value});
-  const ow=el('select',{id:'ow-'+d.k,'aria-label':'Responsável'});const lo=(LISTAS[d.l]||{}).ow;ow.append(el('option',{value:'',text:lo?'Da lista ('+lo+')':'Sem responsável'}));TEAM().forEach(n=>ow.append(el('option',{value:n,text:n})));ow.value=d.ow||'';ow.onchange=()=>save(d,{ow:ow.value});
+  const ow=el('select',{id:'ow-'+d.k,'aria-label':'Responsável'});const lo=(LISTAS[d.l]||{}).ow;ow.append(el('option',{value:'',text:lo?'Da lista ('+lo+')':'Sem responsável'}));TEAM().forEach(n=>ow.append(el('option',{value:n,text:n})));ow.value=d.ow||'';ow.onchange=()=>save(d,{ow:ow.value});if(!isG())ow.disabled=true;
   r.append(el('div',{class:'c-st'},el('span',{class:'mobl',text:'Status'}),sel),el('div',{class:'c-fu'},el('span',{class:'mobl',text:'Follow-up'}),fu),el('div',{class:'c-ow'},el('span',{class:'mobl',text:'Responsável'}),ow));
   if(open.has(d.k))r.append(editing.has(d.k)?editForm(d):detail(d));return r}
 function detail(d){const cur=st(d);const dl=el('dl',{class:'detail'});const item=(t,v,cls)=>el('div',{class:cls||''},el('dt',{text:t}),el('dd',{},v));
@@ -347,6 +349,7 @@ function renderPros(){kpis();listCards();cities();
   const L=filtered();L.sort((a,b)=>(isDue(b)-isDue(a))||((PR[a.p]??2)-(PR[b.p]??2))||((!!wa(b))-(!!wa(a)))||((+b.g||0)-(+a.g||0))||String(a.n).localeCompare(b.n));
   $('#count').textContent=L.length.toLocaleString('pt-BR')+' leads';const box=$('#list');box.replaceChildren();
   if(!loaded){box.append(el('div',{class:'empty',text:'Carregando as listas da planilha…'}));return}
+  if(!LEADS.length&&!isG()){box.append(el('div',{class:'empty',text:'Nenhuma lista foi destinada a você ainda. Fale com o Pedro.'}));$('#more').hidden=true;return}
   if(!L.length){box.append(el('div',{class:'empty',text:'Nenhum lead com esses filtros. Limpe a busca ou troque a lista.'}));$('#more').hidden=true;return}
   const fr=document.createDocumentFragment();L.slice(0,page).forEach(d=>fr.append(row(d)));box.append(fr);$('#more').hidden=L.length<=page}
 
@@ -472,6 +475,7 @@ let poll=null;
 async function start(){$('#vLogin').hidden=true;$('#tabs').hidden=false;$('#bOut').hidden=false;
   $('#meBox').replaceChildren('Olá, ',el('b',{text:ME.nome}),isG()?el('span',{class:'role',text:'GESTÃO'}):'');
   document.querySelector('[data-v=dash]').hidden=!isG();document.querySelector('[data-v=adm]').hidden=!isG();$('#bImp').hidden=!isG();
+  $('#fOw').hidden=!isG();$('#fMine').hidden=!isG();if(!isG()){F.ow='';F.mine=false}
   setView(isG()&&view!=='pros'?view:'pros');setSync('','Carregando a planilha…');
   try{const j=await call('load');ME=j.eu||ME;setData(j,true);loaded=true;syncUI();render();setSync('on',DEMO?'Demonstração (dados neste navegador)':'Conectado à planilha')}
   catch(e){setSync('off',e.message);$('#list').replaceChildren(el('div',{class:'empty',text:'Não consegui carregar a planilha: '+e.message}));return}
