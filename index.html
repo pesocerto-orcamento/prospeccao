@@ -377,6 +377,12 @@ function openNew(){const c=$('#newCard');if(!c.hidden){c.hidden=true;return}c.re
 const MAPK={n:['nome','escola','igreja','empresa','razao','estabelecimento','cliente','lead'],c:['municipio','cidade'],b:['bairro','regiao','distrito','area'],w:['celular','whatsapp','whats','cel'],f:['telefone','fone','fixo','tel'],
  e:['e-mail','email'],ig:['instagram','insta'],ct:['diretor','pastor','padre','decisor','contato','proprietario','dono','gerente'],a:['endereco','logradouro','rua'],t:['categoria','tipo','rede','denominacao','segmento','ramo'],p:['prioridade'],o:['observ','anota']};
 const nz=s=>String(s||'').normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const NOMAP=['fonte','confirmad','canal','data ','respons','pronto','produto','ficha','origem','codigo','inep','cep','#','interesse','anotac','status','follow'];
+function autoMap(head){const H=head.map(h=>nz(h).trim());const used=new Set(),mp={};
+  const bad=(i,k)=>NOMAP.some(w=>H[i].includes(w)&&!(k==='o'&&w==='anotac'));
+  [(h,kw)=>h===kw,(h,kw)=>h.startsWith(kw),(h,kw)=>h.includes(kw)].forEach(test=>{
+    Object.entries(MAPK).forEach(([k,keys])=>{if(k in mp)return;for(const kw of keys){const i=H.findIndex((h,ix)=>h&&!used.has(ix)&&!bad(ix,k)&&test(h,kw));if(i>=0){mp[k]=i;used.add(i);break}}})});
+  return mp}
 let XLSXp=null;function loadXLSX(){if(window.XLSX)return Promise.resolve();if(XLSXp)return XLSXp;XLSXp=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=()=>{XLSXp=null;rej()};document.head.append(s)});return XLSXp}
 function openImp(){const c=$('#impCard');if(!c.hidden){c.hidden=true;return}c.replaceChildren();const f=el('form',{class:'form'});
   const nm=el('input',{type:'text',name:'n',required:'required',placeholder:'Ex.: Supermercados Resende'});const sg=el('select',{name:'seg'});SEGS.forEach(s=>sg.append(el('option',{value:s,text:s})));
@@ -388,12 +394,14 @@ function openImp(){const c=$('#impCard');if(!c.hidden){c.hidden=true;return}c.re
     try{const wb=XLSX.read(await fi.files[0].arrayBuffer(),{type:'array'});const sh=wb.Sheets[wb.SheetNames.includes('Leads')?'Leads':wb.SheetNames[0]];
       const aoa=XLSX.utils.sheet_to_json(sh,{header:1,raw:false,defval:''});const hi=aoa.findIndex(r=>r.filter(x=>String(x).trim()).length>=2);if(hi<0)throw 0;
       const head=aoa[hi].map(x=>String(x).trim());const rows=aoa.slice(hi+1).filter(r=>r.some(x=>String(x).trim()));const used=new Set(),mp={};
-      Object.entries(MAPK).forEach(([k,keys])=>{for(const kw of keys){const i=head.findIndex((h,ix)=>!used.has(ix)&&nz(h).includes(kw)&&!(k==='ct'&&nz(h).includes('respons')));if(i>=0){mp[k]=i;used.add(i);break}}});
+      Object.assign(mp,autoMap(head));
       P={head,rows,mp};if(!nm.value)nm.value=fi.files[0].name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_-]+/g,' ');
       const mapBox=el('div',{class:'map'});const pv=el('div',{class:'prev scroll'});
       const prev=()=>{const t=el('table',{class:'t'});const fs=FIELDS.filter(([k])=>k in P.mp);t.append(el('tr',{},fs.map(([,l])=>el('th',{text:l}))));rows.slice(0,4).forEach(r=>t.append(el('tr',{},fs.map(([k])=>el('td',{text:String(r[P.mp[k]]||'')})))));pv.replaceChildren(t)};
       FIELDS.forEach(([k,l])=>{const s=el('select',{});s.append(el('option',{value:'',text:'— não usar —'}));head.forEach((h,i)=>s.append(el('option',{value:String(i),text:h||('Coluna '+(i+1))})));s.value=k in mp?String(mp[k]):'';s.onchange=()=>{if(s.value==='')delete P.mp[k];else P.mp[k]=+s.value;prev()};mapBox.append(el('label',{},l,s))});
-      zone.replaceChildren(el('div',{class:'sub',text:rows.length+' linhas encontradas. Confira de qual coluna vem cada campo:'}),mapBox,el('div',{class:'sub',text:'Prévia:'}),pv);prev();
+      const warn=el('div',{class:'note'});const chk=()=>{const n=('n' in P.mp)?rows.filter(r=>String(r[P.mp.n]||'').trim()).length:0;warn.hidden=('n' in P.mp)&&n===rows.length;warn.textContent=('n' in P.mp)?'Atenção: só '+n+' de '+rows.length+' linhas têm algo na coluna escolhida como Nome ("'+head[P.mp.n]+'"). Só essas serão importadas. Confira se é a coluna certa.':'Escolha qual coluna é o Nome.'};
+      mapBox.querySelectorAll('select').forEach(x=>x.addEventListener('change',chk));
+      zone.replaceChildren(el('div',{class:'sub',text:rows.length+' linhas encontradas. Confira de qual coluna vem cada campo:'}),mapBox,warn,el('div',{class:'sub',text:'Prévia:'}),pv);prev();chk();
     }catch(e){P=null;zone.replaceChildren(el('div',{class:'note',text:'Não consegui ler esse arquivo. Salve como .xlsx ou .csv com os títulos na primeira linha.'}))}};
   const cancel=el('button',{class:'btn',type:'button',text:'Cancelar'});cancel.onclick=()=>{c.hidden=true};const sub=el('button',{class:'btn pri',type:'submit',text:'Importar lista'});f.append(el('div',{class:'full actions'},cancel,sub));
   f.onsubmit=async e=>{e.preventDefault();if(!P){toast('Escolha o arquivo primeiro');return}if(!('n' in P.mp)){toast('Escolha a coluna do nome');return}
