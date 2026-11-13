@@ -155,6 +155,13 @@ table.t tr.tot td{font-weight:700;border-bottom:0}
 .lgdiv{border-left:1px solid var(--line);padding-left:12px}
 .loginlogo{display:block;height:84px;width:auto;margin:4px auto 6px}
 .danger-zone{border-color:var(--bad-soft)}
+.row.locked{background:var(--sunk)}.row.locked .nm1{color:var(--muted)}
+.tag.lock{background:var(--surface);color:var(--muted);border:1px solid var(--line);margin-bottom:2px}
+.vend{display:flex;flex-wrap:wrap;gap:6px}
+.vchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer;background:var(--surface)}
+.vchip:has(input:checked){background:var(--brand-soft);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
+.vacts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#vAdm table.t td{white-space:normal}
 </style>
 </head>
 <body>
@@ -224,7 +231,7 @@ table.t tr.tot td{font-weight:700;border-bottom:0}
 const CFGX=window.PROSP_CONFIG||{};const URL_API=(CFGX.SCRIPT_URL||'').trim();const DEMO=!URL_API;
 const META=Number(CFGX.META_DIARIA||10);
 const STS=['Não contatado','1º contato feito','Respondeu','Visita agendada','Orçamento enviado','Negociando','Fechado','Sem interesse','Contato inválido'];
-const SEGS=['Food service','Escolas públicas','Escolas particulares','Igrejas','Supermercados','Hotéis e pousadas','Indústria','Outros'];
+const SEGS=['Clientes da loja','Food service','Escolas públicas','Escolas particulares','Igrejas','Supermercados','Hotéis e pousadas','Indústria','Outros'];
 const FIELDS=[['n','Nome'],['t','Tipo / categoria'],['c','Cidade'],['b','Bairro'],['w','Celular / WhatsApp'],['f','Telefone fixo'],['e','E-mail'],['ig','Instagram'],['ct','Contato (nome / cargo)'],['a','Endereço'],['p','Prioridade (A, B ou C)'],['o','Observações']];
 const $=s=>document.querySelector(s);
 function el(t,a,...ch){const e=document.createElement(t);if(a)for(const k in a){if(k==='text')e.textContent=a[k];else if(a[k]!=null&&a[k]!==false)e.setAttribute(k,a[k])}ch.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
@@ -254,16 +261,17 @@ function demoSave(){ls.set('pc-demo',DEMOD)}
 async function demoCall(a,p){const D=await demoData();const u=ls.get('pc-demo-user',null);
   if(a==='login'){if(String(p.pin).trim()!=='1234')throw new Error('PIN incorreto. No modo demonstração (sem a planilha ligada) o PIN de todos é 1234.');const e=D.equipe.find(x=>x.nome===p.nome);ls.set('pc-demo-user',e);return {ok:true,token:'demo',nome:e.nome,perfil:e.perfil}}
   if(!u)throw new Error('Entre primeiro');
-  if(a==='load'||a==='changes'){const LM={};D.listas.forEach(l=>LM[l.id]=l);const g=u.perfil==='Gestão';const vis=D.leads.filter(d=>g||(d.ow||(LM[d.l]||{}).ow||'')===u.nome);const ids=new Set(vis.map(d=>d.l));
-    return {ok:true,eu:u,equipe:D.equipe,listas:D.listas.filter(l=>g||l.ow===u.nome||ids.has(l.id)),leads:vis,ids:a==='changes'?vis.map(d=>d.k):undefined,atividade:D.atividade.filter(x=>g||x.by===u.nome),agora:Date.now()}}
-  if(a==='update'){const d=D.leads.find(x=>x.k===p.id);if(!d)throw new Error('Lead não encontrado');const cur=Object.assign({},d);Object.assign(d,p.fields);
+  if(a==='load'||a==='changes'){const LM={};D.listas.forEach(l=>LM[l.id]=l);const g=u.perfil==='Gestão';const vis=D.leads.filter(d=>g||d.ow===u.nome||donos(LM[d.l]).includes(u.nome));const ids=new Set(vis.map(d=>d.l));
+    return {ok:true,eu:u,equipe:D.equipe,listas:D.listas.filter(l=>g||donos(l).includes(u.nome)||ids.has(l.id)),leads:vis,ids:a==='changes'?vis.map(d=>d.k):undefined,atividade:D.atividade.filter(x=>g||x.by===u.nome),agora:Date.now()}}
+  if(a==='update'){const d=D.leads.find(x=>x.k===p.id);if(!d)throw new Error('Lead não encontrado');const cur=Object.assign({},d);const fx=Object.assign({},p.fields);if(u.perfil!=='Gestão'){if(cur.ow&&cur.ow!==u.nome)throw new Error('Este lead está com '+cur.ow);delete fx.ow;if(!cur.ow)fx.ow=u.nome}Object.assign(d,fx);
     if(('w2' in p.fields&&d.w2&&!cur.w2&&!cur.w)||('w' in p.fields&&d.w&&!cur.w&&!cur.w2&&!cur.wgby)){d.wgby=u.nome;d.wgday=today()}
     let contou=false;if(p.contact&&cur.cd!==today()){d.cd=today();contou=true;if(!d.st||d.st==='Não contatado')d.st='1º contato feito';D.atividade.push({day:today(),by:u.nome,k:d.k,l:d.l,acao:'Contato',st:d.st})}
     d.by=u.nome;d.at=String(Date.now());demoSave();return {ok:true,lead:d,contou}}
   if(a==='add'){const o=Object.assign({},p.lead,{k:'nv'+Date.now().toString(36),st:'Não contatado',ow:p.lead.ow||u.nome,by:u.nome,at:String(Date.now())});if(o.w){o.wgby=u.nome;o.wgday=today()}D.leads.push(o);demoSave();return {ok:true,lead:o}}
   if(a==='import'){let id=p.meta.id;if(!id){id='im'+Date.now().toString(36);D.listas.push({id,n:p.meta.n,seg:p.meta.seg,ow:p.meta.ow,count:0,by:u.nome})}
-    p.rows.forEach((r,i)=>D.leads.push(Object.assign({},r,{k:id+'-'+(p.offset+i),l:id,st:'Não contatado',at:String(Date.now())})));D.listas.find(x=>x.id===id).count+=p.rows.length;demoSave();return {ok:true,id,n:p.rows.length}}
+    p.rows.forEach((r,i)=>D.leads.push(Object.assign({},r,{k:id+'-'+(p.offset+i),l:id,st:r.st||'Não contatado',at:String(Date.now())})));D.listas.find(x=>x.id===id).count+=p.rows.length;demoSave();return {ok:true,id,n:p.rows.length}}
   if(a==='deleteList'){const n0=D.leads.length;D.leads=D.leads.filter(x=>x.l!==p.id);D.listas=D.listas.filter(x=>x.id!==p.id);demoSave();return {ok:true,removidos:n0-D.leads.length}}
+  if(a==='splitList'){const L=D.listas.find(x=>x.id===p.id);const ds=donos(L);if(ds.length<2)throw new Error('Escolha pelo menos 2 vendedores');let n=0;D.leads.forEach(d=>{if(d.l===p.id&&!d.ow){d.ow=ds[n%ds.length];d.at=String(Date.now());n++}});demoSave();return {ok:true,divididos:n,vendedores:ds}}
   if(a==='setListOwner'){const L=D.listas.find(x=>x.id===p.id);if(L)L.ow=p.ow;demoSave();return {ok:true}}
   throw new Error('Ação desconhecida')}
 
@@ -282,13 +290,17 @@ function setData(j,full){
   ACT=j.atividade||ACT;SINCE=j.agora||Date.now();
 }
 const st=d=>d.st||'Não contatado';
-const owner=d=>d.ow||(LISTAS[d.l]&&LISTAS[d.l].ow)||'';
+const donos=l=>String((l&&l.ow)||'').split(/[,;\/]/).map(x=>x.trim()).filter(Boolean);
+const owners=d=>d.ow?[d.ow]:donos(LISTAS[d.l]);
+const owner=d=>d.ow||'';
+const lockedFor=d=>!isG()&&!!d.ow&&d.ow!==ME.nome;
+const ownerTxt=d=>d.ow||(donos(LISTAS[d.l]).length?donos(LISTAS[d.l]).join(' e ')+' (livre)':'');
 const isDue=d=>!!(d.fu&&d.fu<=today()&&!['Fechado','Sem interesse','Contato inválido'].includes(st(d)));
 const wa=d=>d.w2||d.w||(isCell(d.f)?d.f:'');
 const scoped=()=>LEADS.filter(d=>!F.l||d.l===F.l);
 function filtered(){const q=F.q.trim().toLowerCase();const qd=q.replace(/\D/g,'');
   return scoped().filter(d=>{if(F.c&&d.c!==F.c)return false;if(F.p&&d.p!==F.p)return false;if(F.st&&st(d)!==F.st)return false;
-    const o=owner(d);if(F.ow==='-'&&o)return false;if(F.ow&&F.ow!=='-'&&o!==F.ow)return false;if(F.mine&&o!==ME.nome)return false;
+    const os=owners(d);if(F.ow==='-'&&os.length)return false;if(F.ow&&F.ow!=='-'&&!os.includes(F.ow))return false;if(F.mine&&!(d.ow===ME.nome||(!d.ow&&os.includes(ME.nome))))return false;
     if(F.w&&!wa(d))return false;if(F.now&&wa(d))return false;if(F.due&&!isDue(d))return false;
     if(q){const hay=[d.n,d.b,d.ct,d.ig,d.t,d.c,d.nt,d.c2,d.e].join(' ').toLowerCase();const ph=[d.w,d.f,d.w2].join(' ').replace(/\D/g,'');if(!hay.includes(q)&&!(qd.length>=4&&ph.includes(qd)))return false}
     return true})}
@@ -307,7 +319,7 @@ function kpis(){const L=scoped();const c={tot:L.length,w:0,ct:0,neg:0,won:0,due:
 function listCards(){const box=$('#lists');box.replaceChildren();
   Object.values(LISTAS).forEach(L=>{const ds=LEADS.filter(d=>d.l===L.id);const ct=ds.filter(d=>st(d)!=='Não contatado').length;const w=ds.filter(d=>wa(d)).length;const pct=ds.length?Math.round(ct/ds.length*100):0;
     const b=el('div',{class:'lst',role:'button',tabindex:'0','aria-pressed':String(F.l===L.id)},el('span',{class:'seg',text:L.seg}),el('span',{class:'nm',text:String(L.n).startsWith(L.seg+' · ')?L.n.slice(L.seg.length+3):L.n}),
-      el('span',{class:'meta',text:ds.length+' leads · '+w+' c/ WhatsApp · '+pct+'% contatados'}),el('div',{class:'prog'},el('i',{style:'width:'+pct+'%'})),el('span',{class:'owner'},'Vendedor: ',el('b',{text:L.ow||'ninguém ainda'})));
+      el('span',{class:'meta',text:ds.length+' leads · '+w+' c/ WhatsApp · '+pct+'% contatados'}),el('div',{class:'prog'},el('i',{style:'width:'+pct+'%'})),el('span',{class:'owner'},donos(L).length>1?'Vendedores: ':'Vendedor: ',el('b',{text:donos(L).join(', ')||'ninguém ainda'})));
     const go=()=>{F.l=F.l===L.id?'':L.id;page=100;syncUI();render()};b.onclick=go;b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}};box.append(b)})}
 function cities(){const s=new Set(scoped().map(d=>d.c).filter(Boolean));const sel=$('#fCity');sel.replaceChildren(el('option',{value:'',text:'Todas as cidades'}));[...s].sort().forEach(c=>sel.append(el('option',{value:c,text:c})));if(F.c&&!s.has(F.c))F.c='';sel.value=F.c}
 function cpBtn(v){const b=el('button',{class:'cp',type:'button','aria-label':'Copiar',text:'copiar'});b.onclick=()=>copy(v);return b}
@@ -315,18 +327,22 @@ function phoneCell(d){const box=el('div',{class:'phone c-phone'},el('span',{clas
   if(w){const ln=waLink(w,d);box.append(el('span',{},ln?el('a',{href:ln,target:'_blank',rel:'noopener',text:'WhatsApp '+w}):w,cpBtn(w)))}
   if(d.f&&d.f!==w)box.append(el('span',{class:'fx'},'Fixo '+d.f,cpBtn(d.f)));
   if(!w&&!d.f)box.append(el('span',{class:'nophone',text:d.ig?'Sem telefone · tente o Instagram':'Sem telefone'}));return box}
-function row(d){const cur=st(d);
-  const r=el('div',{class:'row'+(isDue(d)?' due':'')+(cur==='Fechado'?' won':'')+(['Sem interesse','Contato inválido'].includes(cur)?' dead':'')});
+function row(d){const cur=st(d);const lk=lockedFor(d);
+  const r=el('div',{class:'row'+(lk?' locked':'')+(isDue(d)?' due':'')+(cur==='Fechado'?' won':'')+(['Sem interesse','Contato inválido'].includes(cur)?' dead':'')});
   const ex=el('button',{class:'exp',type:'button','aria-expanded':String(open.has(d.k)),'aria-label':'Detalhes de '+d.n,text:open.has(d.k)?'–':'+'});ex.onclick=()=>{open.has(d.k)?open.delete(d.k):open.add(d.k);render()};
   r.append(ex,el('div',{},el('div',{class:'nm1',text:d.n}),el('div',{class:'sub',text:[d.b,d.ig].filter(Boolean).join(' · ')})),
     el('div',{class:'c-cat sub'},el('span',{class:'tag'+(String(d.k).startsWith('nv')?' new':''),text:String(d.k).startsWith('nv')?'Novo':(LISTAS[d.l]||{}).seg||''}),[d.t,d.c].filter(Boolean).join(' · ')),
     el('div',{class:'c-prio'},el('span',{class:'prio '+(d.p||'C'),text:d.p||'C'})),phoneCell(d),
-    el('div',{class:'ctc c-ctc'},el('span',{class:'mobl',text:'Contato'}),d.c2?el('b',{text:d.c2}):(d.ct||el('span',{class:'sub',text:'—'}))));
-  const sel=el('select',{id:'st-'+d.k,'aria-label':'Status'});STS.forEach(x=>sel.append(el('option',{value:x,text:x})));sel.value=cur;sel.onchange=()=>save(d,{st:sel.value},true);
-  const fu=el('input',{type:'date',id:'fu-'+d.k,'aria-label':'Próximo follow-up',value:d.fu||''});fu.onchange=()=>save(d,{fu:fu.value});
-  const ow=el('select',{id:'ow-'+d.k,'aria-label':'Responsável'});const lo=(LISTAS[d.l]||{}).ow;ow.append(el('option',{value:'',text:lo?'Da lista ('+lo+')':'Sem responsável'}));TEAM().forEach(n=>ow.append(el('option',{value:n,text:n})));ow.value=d.ow||'';ow.onchange=()=>save(d,{ow:ow.value});if(!isG())ow.disabled=true;
+    el('div',{class:'ctc c-ctc'},el('span',{class:'mobl',text:'Contato'}),lk?el('span',{class:'tag lock',text:'Com '+d.ow}):'',d.c2?el('b',{text:d.c2}):(d.ct||el('span',{class:'sub',text:'—'}))));
+  const sel=el('select',{id:'st-'+d.k,'aria-label':'Status'});STS.forEach(x=>sel.append(el('option',{value:x,text:x})));sel.value=cur;sel.onchange=()=>save(d,{st:sel.value},true);sel.disabled=lk;
+  const fu=el('input',{type:'date',id:'fu-'+d.k,'aria-label':'Próximo follow-up',value:d.fu||''});fu.onchange=()=>save(d,{fu:fu.value});fu.disabled=lk;
+  const ow=el('select',{id:'ow-'+d.k,'aria-label':'Responsável'});const lo=donos(LISTAS[d.l]);ow.append(el('option',{value:'',text:lo.length?(lo.length>1?'Livre ('+lo.join(' e ')+')':'Da lista ('+lo[0]+')'):'Sem responsável'}));TEAM().forEach(n=>ow.append(el('option',{value:n,text:n})));ow.value=d.ow||'';ow.onchange=()=>save(d,{ow:ow.value});if(!isG())ow.disabled=true;
   r.append(el('div',{class:'c-st'},el('span',{class:'mobl',text:'Status'}),sel),el('div',{class:'c-fu'},el('span',{class:'mobl',text:'Follow-up'}),fu),el('div',{class:'c-ow'},el('span',{class:'mobl',text:'Responsável'}),ow));
-  if(open.has(d.k))r.append(editing.has(d.k)?editForm(d):detail(d));return r}
+  if(open.has(d.k))r.append(lk?lockedDetail(d):editing.has(d.k)?editForm(d):detail(d));return r}
+function lockedDetail(d){const dl=el('dl',{class:'detail'});const item=(t,v,cls)=>el('div',{class:cls||''},el('dt',{text:t}),el('dd',{},v));
+  dl.append(el('div',{class:'full note',text:'Este lead está com '+d.ow+'. Só o Pedro pode passar para você.'}));
+  if(d.a||d.b)dl.append(item('Endereço',[d.a,d.b,d.c].filter(Boolean).join(' – ')));dl.append(item('Status',st(d)));if(d.cd)dl.append(item('Último contato',d.cd.split('-').reverse().join('/')));
+  if(d.o)dl.append(item('Observações',d.o,'full'));return dl}
 function detail(d){const cur=st(d);const dl=el('dl',{class:'detail'});const item=(t,v,cls)=>el('div',{class:cls||''},el('dt',{text:t}),el('dd',{},v));
   if(d.a||d.b)dl.append(item('Endereço',[d.a,d.b,d.c].filter(Boolean).join(' – ')));
   if(d.e)dl.append(item('E-mail',el('span',{},d.e,cpBtn(d.e))));
@@ -340,7 +356,7 @@ function detail(d){const cur=st(d);const dl=el('dl',{class:'detail'});const item
   const ed=el('button',{class:'btn',type:'button',text:'Editar dados do lead'});ed.onclick=()=>{editing.add(d.k);render()};
   dl.append(el('div',{},el('dt',{},el('label',{for:'c2-'+d.k,text:'Decisor confirmado'})),el('dd',{},c2)),el('div',{},el('dt',{},el('label',{for:'w2-'+d.k,text:'WhatsApp conseguido'})),el('dd',{},w2)),
     el('div',{},el('dt',{text:'Ações'}),el('dd',{style:'display:flex;gap:6px;flex-wrap:wrap'},btn,ed)),el('div',{class:'full'},el('dt',{},el('label',{for:'nt-'+d.k,text:'Anotações'})),el('dd',{},nt)));
-  const who=[];const o=owner(d);if(o)who.push('Responsável: '+o);if(d.by)who.push('última alteração: '+d.by+(d.at?' em '+new Date(Number(d.at)).toLocaleString('pt-BR'):''));if(d.cd)who.push('último contato: '+d.cd.split('-').reverse().join('/'));
+  const who=[];const o=ownerTxt(d);if(o)who.push('Responsável: '+o);if(d.by)who.push('última alteração: '+d.by+(d.at?' em '+new Date(Number(d.at)).toLocaleString('pt-BR'):''));if(d.cd)who.push('último contato: '+d.cd.split('-').reverse().join('/'));
   if(who.length)dl.append(el('div',{class:'full who',text:who.join(' · ')}));return dl}
 function editForm(d){const f=el('form',{class:'detail form'});
   FIELDS.forEach(([k,l])=>f.append(el('label',{class:k==='o'?'full':''},l,k==='p'?(()=>{const s=el('select',{name:k});['A','B','C'].forEach(x=>s.append(el('option',{value:x,text:x})));s.value=d.p||'C';return s})():el('input',{type:k==='e'?'email':(k==='w'||k==='f')?'tel':'text',name:k,value:d[k]||''}))));
@@ -349,7 +365,8 @@ function editForm(d){const f=el('form',{class:'detail form'});
   f.onsubmit=e=>{e.preventDefault();const fd=new FormData(f);const ch={};FIELDS.forEach(([k])=>{let v=String(fd.get(k)||'').trim();if(k==='w'||k==='f')v=fmtPhone(v);if(v!==(d[k]||''))ch[k]=v});editing.delete(d.k);if(Object.keys(ch).length)save(d,ch);else render()};return f}
 const PR={A:0,B:1,C:2};
 function renderPros(){kpis();listCards();cities();
-  const L=filtered();L.sort((a,b)=>(isDue(b)-isDue(a))||((PR[a.p]??2)-(PR[b.p]??2))||((!!wa(b))-(!!wa(a)))||((+b.g||0)-(+a.g||0))||String(a.n).localeCompare(b.n));
+  const L=filtered();const dead=d=>['Sem interesse','Contato inválido','Fechado'].includes(st(d))?1:0;
+  L.sort((a,b)=>(lockedFor(a)-lockedFor(b))||(dead(a)-dead(b))||(isDue(b)-isDue(a))||((PR[a.p]??2)-(PR[b.p]??2))||((!!wa(b))-(!!wa(a)))||((+b.g||0)-(+a.g||0)));
   $('#count').textContent=L.length.toLocaleString('pt-BR')+' leads';const box=$('#list');box.replaceChildren();
   if(!loaded){box.append(el('div',{class:'empty',text:'Carregando as listas da planilha…'}));return}
   if(!LEADS.length&&!isG()){box.append(el('div',{class:'empty',text:'Nenhuma lista foi destinada a você ainda. Fale com o Pedro.'}));$('#more').hidden=true;return}
@@ -378,42 +395,82 @@ function openNew(){const c=$('#newCard');if(!c.hidden){c.hidden=true;return}c.re
 
 /* ================= importar lista ================= */
 const MAPK={n:['nome','escola','igreja','empresa','razao','estabelecimento','cliente','lead'],c:['municipio','cidade'],b:['bairro','regiao','distrito','area'],w:['celular','whatsapp','whats','cel'],f:['telefone','fone','fixo','tel'],
- e:['e-mail','email'],ig:['instagram','insta'],ct:['diretor','pastor','padre','decisor','contato','proprietario','dono','gerente'],a:['endereco','logradouro','rua'],t:['categoria','tipo','rede','denominacao','segmento','ramo'],p:['prioridade'],o:['observ','anota']};
+ e:['e-mail','email'],ig:['instagram','insta'],ct:['diretor','pastor','padre','decisor','contato','proprietario','dono','gerente'],a:['endereco','logradouro','rua'],t:['segmento','categoria','tipo','rede','denominacao','ramo'],p:['prioridade','classe','curva'],o:['observ','anota'],
+ ow:['responsavel','vendedor'],st:['status','situacao'],cd:['data contato','data ultimo contato','ultimo contato','data do contato'],fu:['prox. follow','proximo follow','follow-up','follow']};
 const nz=s=>String(s||'').normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const NOMAP=['fonte','confirmad','canal','data ','respons','pronto','produto','ficha','origem','codigo','inep','cep','#','interesse','anotac','status','follow'];
+const IMPKEYS=new Set(['n','t','c','b','w','f','e','ig','ct','a','p','o','ow','st','cd','fu']);
 function autoMap(head){const H=head.map(h=>nz(h).trim());const used=new Set(),mp={};
-  const bad=(i,k)=>NOMAP.some(w=>H[i].includes(w)&&!(k==='o'&&w==='anotac'));
+  const bad=(i,k)=>NOMAP.some(w=>H[i].includes(w)&&!(MAPK[k]||[]).some(kw=>kw.includes(w.trim())||w.includes(kw)));
   [(h,kw)=>h===kw,(h,kw)=>h.startsWith(kw),(h,kw)=>h.includes(kw)].forEach(test=>{
-    Object.entries(MAPK).forEach(([k,keys])=>{if(k in mp)return;for(const kw of keys){const i=H.findIndex((h,ix)=>h&&!used.has(ix)&&!bad(ix,k)&&test(h,kw));if(i>=0){mp[k]=i;used.add(i);break}}})});
+    Object.entries(MAPK).forEach(([k,keys])=>{if(k in mp)return;if(!IMPKEYS.has(k))return;for(const kw of keys){const i=H.findIndex((h,ix)=>h&&!used.has(ix)&&!bad(ix,k)&&test(h,kw));if(i>=0){mp[k]=i;used.add(i);break}}})});
   return mp}
 let XLSXp=null;function loadXLSX(){if(window.XLSX)return Promise.resolve();if(XLSXp)return XLSXp;XLSXp=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=()=>{XLSXp=null;rej()};document.head.append(s)});return XLSXp}
+const IMPF=[...FIELDS,['ow','Responsável / vendedor'],['st','Status'],['cd','Data do último contato'],['fu','Próximo follow-up']];
+const STMAP={'a contatar':'Não contatado','nao contatado':'Não contatado','sem resposta':'1º contato feito','em conversa':'Respondeu','telefone errado':'Contato inválido','nao e mais cliente-alvo':'Sem interesse'};
+function normSt(v){const n=nz(v).trim();if(!n)return '';if(STMAP[n])return STMAP[n];const hit=STS.find(x=>nz(x)===n);return hit||''}
+function normOw(v){const n=nz(v).trim();if(!n)return '';const T=TEAM();let hit=T.find(x=>nz(x)===n);if(hit)return hit;const f=n.split(/\s+/)[0];hit=T.find(x=>nz(x).split(/\s+/)[0]===f);return hit||''}
+function normP(v){const n=String(v||'').toUpperCase().trim();if(!n)return '';if(n.startsWith('TOP'))return 'A';if(n.includes('SEM'))return 'C';if('ABC'.includes(n[0]))return n[0];return ''}
+function cellTxt(v,h){if(v instanceof Date){if(isNaN(v))return '';return h==='iso'?day(v):String(v.getDate()).padStart(2,'0')+'/'+String(v.getMonth()+1).padStart(2,'0')+'/'+v.getFullYear()}
+  if(typeof v==='number'){if(h&&/r\$|total|ticket|valor|fatur/.test(nz(h)))return 'R$ '+v.toLocaleString('pt-BR',{maximumFractionDigits:0});return Number.isInteger(v)?String(v):String(v)}
+  return String(v==null?'':v).trim()}
+const EXTRA_RX=/total|compr|vendas|ticket|desde|ranking|alerta|classe|curva|valor|fatur/;
 function openImp(){const c=$('#impCard');if(!c.hidden){c.hidden=true;return}c.replaceChildren();const f=el('form',{class:'form'});
-  const nm=el('input',{type:'text',name:'n',required:'required',placeholder:'Ex.: Supermercados Resende'});const sg=el('select',{name:'seg'});SEGS.forEach(s=>sg.append(el('option',{value:s,text:s})));
-  const ow=el('select',{name:'ow'});ow.append(el('option',{value:'',text:'Sem vendedor por enquanto'}));TEAM().forEach(n=>ow.append(el('option',{value:n,text:n})));
-  const fi=el('input',{type:'file',name:'file',accept:'.xlsx,.xls,.csv',required:'required'});const zone=el('div',{class:'full'});
-  f.append(el('label',{},'Nome da lista *',nm),el('label',{},'Segmento',sg),el('label',{},'Vendedor da lista',ow),el('label',{class:'full'},'Arquivo Excel ou CSV (títulos das colunas na primeira linha)',fi),zone);
-  let P=null;
+  const nm=el('input',{type:'text',name:'n',required:'required',placeholder:'Ex.: Base de clientes'});const sg=el('select',{name:'seg'});SEGS.forEach(s=>sg.append(el('option',{value:s,text:s})));sg.value='Food service';
+  const ow=el('select',{name:'ow'});ow.append(el('option',{value:'',text:'Usar o vendedor do arquivo / nenhum'}));TEAM().forEach(n=>ow.append(el('option',{value:n,text:'Todas para '+n})));
+  const fi=el('input',{type:'file',name:'file',accept:'.xlsx,.xls,.csv',required:'required'});const zone=el('div',{class:'full',style:'display:grid;gap:10px'});
+  f.append(el('label',{},'Nome da lista *',nm),el('label',{},'Segmento',sg),el('label',{},'Vendedor',ow),el('label',{class:'full'},'Arquivo Excel ou CSV',fi),zone);
+  let P=null,WB=null;
+  const parseSheet=name=>{const aoa=XLSX.utils.sheet_to_json(WB.Sheets[name],{header:1,raw:true,defval:''});const hi=aoa.findIndex(r=>r.filter(x=>String(x).trim()).length>=3);if(hi<0)return null;
+    const head=aoa[hi].map(x=>String(x).trim());const rows=aoa.slice(hi+1).filter(r=>r.some(x=>String(x).trim()));return {name,head,rows}};
+  const build=sheetName=>{const S=parseSheet(sheetName);if(!S){zone.replaceChildren(el('div',{class:'note',text:'Essa aba não tem uma tabela com títulos. Escolha outra.'}));return}
+    const {head,rows}=S;const mp=autoMap(head);
+    if(head.some(h=>/cliente desde|total comprado|ticket medio|n. vendas/.test(nz(h)))||/client/i.test(fi.files[0].name))sg.value='Clientes da loja';
+    else if(head.some(h=>/^escola/.test(nz(h))))sg.value='Escolas públicas';else if(head.some(h=>/^igreja/.test(nz(h))))sg.value='Igrejas';
+    // descarta colunas "constantes" para nome/contato (ex.: coluna Contato = "WhatsApp" em todas)
+    ['n','ct','e','a'].forEach(k=>{if(k in mp&&rows.length>50){const d=new Set(rows.map(r=>String(r[mp[k]]).trim()));if(d.size<=3)delete mp[k]}});
+    const splitIdx=head.findIndex(h=>/^(classe|curva)/.test(nz(h)));
+    const extras=new Set(head.map((h,i)=>i).filter(i=>!Object.values(mp).includes(i)&&EXTRA_RX.test(nz(head[i]))&&!/^f_/.test(head[i])&&rows.some(r=>String(r[i]).trim())));
+    P={head,rows,mp,split:splitIdx,extras};
+    const sheetSel=el('select',{});WB.SheetNames.forEach(n=>sheetSel.append(el('option',{value:n,text:n})));sheetSel.value=sheetName;sheetSel.onchange=()=>build(sheetSel.value);
+    const mapBox=el('div',{class:'map'});
+    IMPF.forEach(([k,l])=>{const s=el('select',{});s.append(el('option',{value:'',text:'— não usar —'}));head.forEach((h,i)=>s.append(el('option',{value:String(i),text:h||('Coluna '+(i+1))})));s.value=k in mp?String(mp[k]):'';
+      s.onchange=()=>{if(s.value==='')delete P.mp[k];else P.mp[k]=+s.value;upd()};mapBox.append(el('label',{},l,s))});
+    const spl=el('select',{});spl.append(el('option',{value:'-1',text:'Não separar: uma lista só'}));head.forEach((h,i)=>spl.append(el('option',{value:String(i),text:'Uma lista para cada "'+h+'"'})));spl.value=String(P.split);spl.onchange=()=>{P.split=+spl.value;upd()};
+    const exBox=el('div',{class:'vend'});head.forEach((h,i)=>{if(!h||/^f_/.test(h))return;const id='ex-'+i;const cb=el('input',{type:'checkbox',id});cb.checked=P.extras.has(i);cb.onchange=()=>{cb.checked?P.extras.add(i):P.extras.delete(i);upd()};exBox.append(el('label',{for:id,class:'vchip'},cb,h))});
+    const sum=el('div',{class:'sub'});const warn=el('div',{class:'note'});const pv=el('div',{class:'prev scroll'});
+    const upd=()=>{const L=toLeads();const groups=groupsOf(L);
+      const nOw=L.filter(x=>x.ow).length,nSt=L.filter(x=>x.st&&x.st!=='Não contatado').length,nW=L.filter(x=>x.w).length;
+      sum.textContent=L.length+' de '+rows.length+' linhas serão importadas · '+nW+' com celular · '+nOw+' já com vendedor · '+nSt+' já contatadas'+(groups.length>1?' · '+groups.length+' listas: '+groups.map(g=>g.name+' ('+g.leads.length+')').join(', '):'');
+      const nn=('n' in P.mp)?rows.filter(r=>String(r[P.mp.n]).trim()).length:0;warn.hidden=('n' in P.mp)&&nn>=rows.length*0.9;
+      warn.textContent=('n' in P.mp)?'Atenção: só '+nn+' de '+rows.length+' linhas têm algo na coluna escolhida como Nome ("'+head[P.mp.n]+'"). Confira se é a coluna certa.':'Escolha qual coluna é o Nome.';
+      const t=el('table',{class:'t'});const cols=[['n','Nome'],['c','Cidade'],['w','Celular'],['p','Pri.'],['ow','Vendedor'],['st','Status'],['o','Observações']];t.append(el('tr',{},cols.map(([,l])=>el('th',{text:l}))));
+      L.slice(0,4).forEach(x=>t.append(el('tr',{},cols.map(([k])=>el('td',{text:String(x[k]||'').slice(0,90)})))));pv.replaceChildren(t)};
+    zone.replaceChildren(el('label',{},'Aba da planilha',sheetSel),el('div',{class:'sub',text:'De qual coluna vem cada campo:'}),mapBox,
+      el('label',{},'Separar em listas',spl),el('div',{class:'sub',text:'Colunas extras que vão para as Observações do lead:'}),exBox,warn,sum,el('div',{class:'sub',text:'Prévia:'}),pv);upd()};
+  const toLeads=()=>{const out=[];P.rows.forEach(r=>{const o={};IMPF.forEach(([k])=>{if(!(k in P.mp))return;const raw=r[P.mp[k]];let v=(k==='cd'||k==='fu')?cellTxt(raw,'iso'):cellTxt(raw,P.head[P.mp[k]]);
+      if(k==='w'||k==='f')v=fmtPhone(v);if(k==='p')v=normP(v);if(k==='ow')v=normOw(v);if(k==='st')v=normSt(v);if((k==='cd'||k==='fu')&&!/^\d{4}-\d\d-\d\d$/.test(v))v='';if(v&&v!=='-')o[k]=v});
+    if(!o.n)return;if(!o.p)o.p='B';if(ow.value)o.ow=ow.value;
+    const ex=[...P.extras].map(i=>{const v=cellTxt(r[i],P.head[i]);return v?P.head[i].replace(/\s*\(R\$\)/,'')+': '+v:''}).filter(Boolean);if(ex.length)o.o=[o.o,ex.join(' · ')].filter(Boolean).join(' · ');
+    if(P.split>=0)o._g=cellTxt(r[P.split])||'Sem classificação';out.push(o)});return out};
+  const groupsOf=L=>{if(P.split<0)return [{name:nm.value.trim()||'Lista importada',leads:L}];const m=new Map();L.forEach(x=>{if(!m.has(x._g))m.set(x._g,[]);m.get(x._g).push(x)});
+    return [...m.entries()].map(([g,ls])=>({name:(nm.value.trim()||'Lista')+' · '+(g.length<=2?'Classe '+g:g),leads:ls}))};
   fi.onchange=async()=>{zone.replaceChildren(el('div',{class:'sub',text:'Lendo o arquivo…'}));try{await loadXLSX()}catch(e){zone.replaceChildren(el('div',{class:'note',text:'Não consegui carregar o leitor de planilhas. Verifique a internet.'}));return}
-    try{const wb=XLSX.read(await fi.files[0].arrayBuffer(),{type:'array'});const sh=wb.Sheets[wb.SheetNames.includes('Leads')?'Leads':wb.SheetNames[0]];
-      const aoa=XLSX.utils.sheet_to_json(sh,{header:1,raw:false,defval:''});const hi=aoa.findIndex(r=>r.filter(x=>String(x).trim()).length>=2);if(hi<0)throw 0;
-      const head=aoa[hi].map(x=>String(x).trim());const rows=aoa.slice(hi+1).filter(r=>r.some(x=>String(x).trim()));const used=new Set(),mp={};
-      Object.assign(mp,autoMap(head));
-      P={head,rows,mp};if(!nm.value)nm.value=fi.files[0].name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_-]+/g,' ');
-      const mapBox=el('div',{class:'map'});const pv=el('div',{class:'prev scroll'});
-      const prev=()=>{const t=el('table',{class:'t'});const fs=FIELDS.filter(([k])=>k in P.mp);t.append(el('tr',{},fs.map(([,l])=>el('th',{text:l}))));rows.slice(0,4).forEach(r=>t.append(el('tr',{},fs.map(([k])=>el('td',{text:String(r[P.mp[k]]||'')})))));pv.replaceChildren(t)};
-      FIELDS.forEach(([k,l])=>{const s=el('select',{});s.append(el('option',{value:'',text:'— não usar —'}));head.forEach((h,i)=>s.append(el('option',{value:String(i),text:h||('Coluna '+(i+1))})));s.value=k in mp?String(mp[k]):'';s.onchange=()=>{if(s.value==='')delete P.mp[k];else P.mp[k]=+s.value;prev()};mapBox.append(el('label',{},l,s))});
-      const warn=el('div',{class:'note'});const chk=()=>{const n=('n' in P.mp)?rows.filter(r=>String(r[P.mp.n]||'').trim()).length:0;warn.hidden=('n' in P.mp)&&n===rows.length;warn.textContent=('n' in P.mp)?'Atenção: só '+n+' de '+rows.length+' linhas têm algo na coluna escolhida como Nome ("'+head[P.mp.n]+'"). Só essas serão importadas. Confira se é a coluna certa.':'Escolha qual coluna é o Nome.'};
-      mapBox.querySelectorAll('select').forEach(x=>x.addEventListener('change',chk));
-      zone.replaceChildren(el('div',{class:'sub',text:rows.length+' linhas encontradas. Confira de qual coluna vem cada campo:'}),mapBox,warn,el('div',{class:'sub',text:'Prévia:'}),pv);prev();chk();
-    }catch(e){P=null;zone.replaceChildren(el('div',{class:'note',text:'Não consegui ler esse arquivo. Salve como .xlsx ou .csv com os títulos na primeira linha.'}))}};
-  const cancel=el('button',{class:'btn',type:'button',text:'Cancelar'});cancel.onclick=()=>{c.hidden=true};const sub=el('button',{class:'btn pri',type:'submit',text:'Importar lista'});f.append(el('div',{class:'full actions'},cancel,sub));
+    try{WB=XLSX.read(await fi.files[0].arrayBuffer(),{type:'array',cellDates:true});
+      let best=WB.SheetNames[0],bs=-1;WB.SheetNames.forEach(n=>{const S=parseSheet(n);if(!S)return;const sc=Object.keys(autoMap(S.head)).length*1000+Math.min(S.rows.length,999);if(sc>bs){bs=sc;best=n}});
+      if(!nm.value)nm.value=fi.files[0].name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_-]+/g,' ');build(best)}
+    catch(e){P=null;zone.replaceChildren(el('div',{class:'note',text:'Não consegui ler esse arquivo. Salve como .xlsx ou .csv com os títulos na primeira linha.'}))}};
+  nm.oninput=()=>{if(P)zone.querySelector('.sub')&&0};
+  const cancel=el('button',{class:'btn',type:'button',text:'Cancelar'});cancel.onclick=()=>{c.hidden=true};const sub=el('button',{class:'btn pri',type:'submit',text:'Importar'});f.append(el('div',{class:'full actions'},cancel,sub));
   f.onsubmit=async e=>{e.preventDefault();if(!P){toast('Escolha o arquivo primeiro');return}if(!('n' in P.mp)){toast('Escolha a coluna do nome');return}
-    const leads=[];P.rows.forEach(r=>{const o={};FIELDS.forEach(([k])=>{if(k in P.mp){let v=String(r[P.mp[k]]??'').trim();if(k==='w'||k==='f')v=fmtPhone(v);if(k==='p')v=v.toUpperCase().slice(0,1);if(v&&v!=='-')o[k]=v}});if(o.n){if(!['A','B','C'].includes(o.p))o.p='B';leads.push(o)}});
-    sub.disabled=true;let id=null;
-    try{for(let i=0;i<leads.length;i+=400){sub.textContent='Importando '+Math.min(i+400,leads.length)+' de '+leads.length+'…';const j=await call('import',{meta:{id,n:nm.value.trim(),seg:sg.value,ow:ow.value},rows:leads.slice(i,i+400),offset:i});id=j.id}
-      toast(leads.length+' leads importados');c.hidden=true;await reload();F.l=id;syncUI();render()}
-    catch(err){toast('Parou no meio: '+err.message+'. O que já foi importado ficou na planilha.');sub.disabled=false;sub.textContent='Importar lista';if(id)reload()}};
-  c.append(el('h3',{text:'Importar nova lista'}),el('p',{class:'sub',style:'margin:0',text:'Funciona com as planilhas CRM que já usamos e com qualquer Excel/CSV que tenha pelo menos o nome. Os leads vão para a aba Leads da planilha.'}),f);c.hidden=false}
+    const groups=groupsOf(toLeads());const total=groups.reduce((a,g)=>a+g.leads.length,0);let done=0,lastId=null;sub.disabled=true;
+    try{for(const g of groups){let id=null;const owners=ow.value||[...new Set(g.leads.map(x=>x.ow).filter(Boolean))].join(', ');
+        for(let i=0;i<g.leads.length;i+=400){sub.textContent='Importando '+(done+Math.min(400,g.leads.length-i))+' de '+total+'…';
+          const rows=g.leads.slice(i,i+400).map(x=>{const y=Object.assign({},x);delete y._g;return y});
+          const j=await call('import',{meta:{id,n:g.name,seg:sg.value,ow:owners},rows,offset:i});id=j.id;done+=rows.length}lastId=id}
+      toast(total+' leads importados em '+groups.length+(groups.length>1?' listas':' lista'));c.hidden=true;await reload();F.l=groups.length===1?lastId:'';syncUI();render()}
+    catch(err){toast('Parou no meio: '+err.message+'. O que já foi importado ficou na planilha.');sub.disabled=false;sub.textContent='Importar';reload()}};
+  c.append(el('h3',{text:'Importar nova lista'}),el('p',{class:'sub',style:'margin:0',text:'Aceita as planilhas CRM que já usamos, a base de clientes e qualquer Excel/CSV com pelo menos o nome. O sistema escolhe a aba e as colunas; confira e ajuste antes de importar.'}),f);c.hidden=false}
 
 /* ================= dashboard ================= */
 let DP=7;
@@ -422,7 +479,7 @@ function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set
   const per=el('div',{class:'filters'},el('h2',{text:'Dashboard da gestão'}),el('span',{class:'spacer'}));
   [[1,'Hoje'],[7,'7 dias'],[30,'30 dias']].forEach(([n,l])=>{const b=el('button',{class:'chip',type:'button','aria-pressed':String(DP===n),text:l});b.onclick=()=>{DP=n;renderDash()};per.append(b)});v.append(per);
   const names=[...TEAM(),'Sem responsável'];const R=Object.fromEntries(names.map(n=>[n,{n,lead:0,ctp:0,wg:0,vis:0,orc:0,won:0,due:0,ct:0}]));
-  LEADS.forEach(d=>{const r=R[owner(d)]||R['Sem responsável'];r.lead++;const s=st(d);if(s!=='Não contatado')r.ct++;if(s==='Visita agendada')r.vis++;if(['Orçamento enviado','Negociando'].includes(s))r.orc++;if(s==='Fechado')r.won++;if(isDue(d))r.due++;
+  LEADS.forEach(d=>{const os=owners(d);const r=os.length===1&&R[os[0]]?R[os[0]]:R['Sem responsável'];r.lead++;const s=st(d);if(s!=='Não contatado')r.ct++;if(s==='Visita agendada')r.vis++;if(['Orçamento enviado','Negociando'].includes(s))r.orc++;if(s==='Fechado')r.won++;if(isDue(d))r.due++;
     if(d.wgby&&days.has(d.wgday)&&R[d.wgby])R[d.wgby].wg++});
   ACT.forEach(a=>{if(a.acao==='Contato'&&days.has(a.day)&&R[a.by])R[a.by].ctp++});
   const meta=META*workdays(DP);const T={lead:0,ctp:0,wg:0,vis:0,orc:0,won:0,due:0,ct:0};Object.values(R).forEach(r=>Object.keys(T).forEach(k=>T[k]+=r[k]));
@@ -430,7 +487,7 @@ function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set
     .forEach(([x,l],i)=>k.append(el('div',{class:'kpi goal'+(i===5&&x?' alert':'')},el('b',{text:typeof x==='number'?x.toLocaleString('pt-BR'):x}),el('span',{text:l}))));v.append(k);
   const t=el('table',{class:'t'});t.append(el('tr',{},['Vendedor','Leads','Contatos','Meta ('+META+'/dia útil)','WhatsApps','Visitas','Orçam./negoc.','Fechados','Vencidos','Contatados'].map(h=>el('th',{text:h}))));
   Object.values(R).forEach(r=>{if(r.n==='Sem responsável'&&!r.lead)return;const pct=r.n==='Sem responsável'?null:Math.round(r.ctp/meta*100);
-    t.append(el('tr',{},el('td',{},el('b',{text:r.n})),el('td',{text:r.lead}),el('td',{text:r.ctp}),el('td',{},pct==null?'—':el('span',{class:'pill '+(pct>=100?'ok':pct>=60?'warn':'bad'),text:pct+'%'})),
+    t.append(el('tr',{},el('td',{},el('b',{text:r.n==='Sem responsável'?'Sem dono / livres':r.n})),el('td',{text:r.lead}),el('td',{text:r.ctp}),el('td',{},pct==null?'—':el('span',{class:'pill '+(pct>=100?'ok':pct>=60?'warn':'bad'),text:pct+'%'})),
       el('td',{text:r.wg}),el('td',{text:r.vis}),el('td',{text:r.orc}),el('td',{text:r.won}),el('td',{},r.due?el('span',{class:'pill bad',text:r.due}):'0'),el('td',{text:r.lead?Math.round(r.ct/r.lead*100)+'%':'—'})))});
   t.append(el('tr',{class:'tot'},['Total',T.lead,T.ctp,'',T.wg,T.vis,T.orc,T.won,T.due,LEADS.length?Math.round(T.ct/LEADS.length*100)+'%':'—'].map(x=>el('td',{text:String(x)}))));
   v.append(el('section',{class:'card'},el('h3',{text:'Por vendedor · '+(DP===1?'hoje':'últimos '+DP+' dias')}),el('div',{class:'scroll'},t),el('p',{class:'sub',style:'margin:0',text:'Contatos vêm da aba Atividade (um por lead por dia). Visitas, orçamentos e fechados mostram a situação atual dos leads de cada vendedor.'})));
@@ -440,25 +497,34 @@ function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set
   STS.slice(1).forEach(s=>fun.append(el('div',{class:'hbar'},el('span',{text:s}),el('div',{class:'tr'},el('i',{style:'width:'+Math.round((cnt[s]||0)/fm*100)+'%'})),el('span',{text:String(cnt[s]||0)}))));
   v.append(el('div',{class:'grid2'},el('section',{class:'card'},el('h3',{text:'Contatos por dia · 14 dias'}),dd),el('section',{class:'card'},el('h3',{text:'Funil (fora "Não contatado")'}),fun)));
   const lt=el('table',{class:'t'});lt.append(el('tr',{},['Lista','Vendedor','Leads','Com WhatsApp','Contatados','Orçam./negoc.','Fechados'].map(h=>el('th',{text:h}))));
-  Object.values(LISTAS).forEach(L=>{const ds=LEADS.filter(d=>d.l===L.id);const c=x=>ds.filter(x).length;lt.append(el('tr',{},el('td',{},el('b',{text:L.n})),el('td',{text:L.ow||'—'}),el('td',{text:ds.length}),el('td',{text:c(wa)}),
+  Object.values(LISTAS).forEach(L=>{const ds=LEADS.filter(d=>d.l===L.id);const c=x=>ds.filter(x).length;lt.append(el('tr',{},el('td',{},el('b',{text:L.n})),el('td',{text:donos(L).join(', ')||'—'}),el('td',{text:ds.length}),el('td',{text:c(wa)}),
     el('td',{text:ds.length?Math.round(c(d=>st(d)!=='Não contatado')/ds.length*100)+'%':'—'}),el('td',{text:c(d=>['Orçamento enviado','Negociando'].includes(st(d)))}),el('td',{text:c(d=>st(d)==='Fechado')})))});
   v.append(el('section',{class:'card'},el('h3',{text:'Por lista'}),el('div',{class:'scroll'},lt)));
   const due=LEADS.filter(isDue).sort((a,b)=>a.fu.localeCompare(b.fu)).slice(0,30);const dt=el('table',{class:'t'});dt.append(el('tr',{},['Lead','Responsável','Status','Follow-up'].map(h=>el('th',{text:h}))));
-  due.forEach(d=>dt.append(el('tr',{},el('td',{text:d.n}),el('td',{text:owner(d)||'—'}),el('td',{text:st(d)}),el('td',{},el('span',{class:'pill bad',text:d.fu.split('-').reverse().join('/')})))));
+  due.forEach(d=>dt.append(el('tr',{},el('td',{text:d.n}),el('td',{text:ownerTxt(d)||'—'}),el('td',{text:st(d)}),el('td',{},el('span',{class:'pill bad',text:d.fu.split('-').reverse().join('/')})))));
   v.append(el('section',{class:'card'},el('h3',{text:'Follow-ups vencidos'}),due.length?el('div',{class:'scroll'},dt):el('p',{class:'sub',style:'margin:0',text:'Ninguém com follow-up atrasado.'})))}
 
 /* ================= equipe e listas ================= */
 function renderAdm(){const v=$('#vAdm');v.replaceChildren();
   const tt=el('table',{class:'t'});tt.append(el('tr',{},['Pessoa','Perfil'].map(h=>el('th',{text:h}))));EQUIPE.forEach(x=>tt.append(el('tr',{},el('td',{},el('b',{text:x.nome})),el('td',{text:x.perfil}))));
   v.append(el('section',{class:'card'},el('h3',{text:'Equipe'}),el('p',{class:'sub',style:'margin:0',text:'Para incluir uma pessoa, trocar um PIN ou bloquear um acesso, edite a aba Equipe da planilha (Nome, PIN, Perfil, Ativo). Vale na hora.'}),el('div',{class:'scroll'},tt)));
-  const lt=el('table',{class:'t'});lt.append(el('tr',{},['Lista','Leads','Vendedor da lista',''].map(h=>el('th',{text:h}))));
-  Object.values(LISTAS).forEach(L=>{const s=el('select',{'aria-label':'Vendedor de '+L.n});s.append(el('option',{value:'',text:'Sem vendedor'}));TEAM().forEach(n=>s.append(el('option',{value:n,text:n})));s.value=L.ow||'';
-    s.onchange=async()=>{const old=L.ow;L.ow=s.value;try{await call('setListOwner',{id:L.id,ow:s.value});toast('Vendedor da lista salvo')}catch(e){L.ow=old;s.value=old||'';toast(e.message)}};
-    const n=LEADS.filter(d=>d.l===L.id).length;const del=el('button',{class:'btn danger',type:'button',text:'Excluir lista'});let armed=false;
+  const lt=el('table',{class:'t'});lt.append(el('tr',{},['Lista','Leads','Vendedores da lista',''].map(h=>el('th',{text:h}))));
+  Object.values(LISTAS).forEach(L=>{const box=el('div',{class:'vend'});const cur=donos(L);
+    TEAM().forEach(nm=>{const id='v-'+L.id+'-'+nm;const cb=el('input',{type:'checkbox',id});cb.checked=cur.includes(nm);cb.dataset.n=nm;
+      cb.onchange=async()=>{const sel=[...box.querySelectorAll('input')].filter(x=>x.checked).map(x=>x.dataset.n);const old=L.ow;L.ow=sel.join(', ');
+        try{await call('setListOwner',{id:L.id,ow:L.ow});toast(sel.length?'Vendedores da lista: '+sel.join(', '):'Lista sem vendedor');renderAdm()}catch(e){L.ow=old;toast(e.message);renderAdm()}};
+      box.append(el('label',{for:id,class:'vchip'},cb,nm))});
+    const n=LEADS.filter(d=>d.l===L.id).length;const livres=LEADS.filter(d=>d.l===L.id&&!d.ow).length;const acts=el('div',{class:'vacts'});
+    if(cur.length>1){const lab='Dividir '+livres+' livres entre '+cur.join(' e ');const sp=el('button',{class:'btn',type:'button',text:lab});let a1=false;sp.disabled=!livres;
+      sp.onclick=async()=>{if(!a1){a1=true;sp.textContent='Confirmar divisão';setTimeout(()=>{if(a1){a1=false;sp.textContent=lab}},5000);return}
+        a1=false;sp.disabled=true;sp.textContent='Dividindo…';try{const j=await call('splitList',{id:L.id});toast(j.divididos+' leads divididos entre '+j.vendedores.join(' e '));await reload()}catch(e){toast(e.message);renderAdm()}};acts.append(sp)}
+    const del=el('button',{class:'btn danger',type:'button',text:'Excluir lista'});let armed=false;
     del.onclick=async()=>{if(!armed){armed=true;del.textContent='Confirmar: apagar '+n+' leads';setTimeout(()=>{if(armed){armed=false;del.textContent='Excluir lista'}},5000);return}
       armed=false;del.disabled=true;del.textContent='Excluindo…';try{const j=await call('deleteList',{id:L.id});toast('Lista excluída · '+j.removidos+' leads removidos da planilha');if(F.l===L.id)F.l='';await reload()}catch(e){toast(e.message);del.disabled=false;del.textContent='Excluir lista'}};
-    lt.append(el('tr',{},el('td',{},el('b',{text:L.n}),el('div',{class:'sub',text:L.seg+(L.by?' · criada por '+L.by:'')})),el('td',{text:n}),el('td',{},s),el('td',{},del)))});
-  v.append(el('section',{class:'card'},el('h3',{text:'Listas'}),el('p',{class:'sub',style:'margin:0',text:'Os leads de uma lista ficam com o vendedor escolhido aqui, a não ser que alguém troque o responsável de um lead específico. "Excluir lista" apaga a lista inteira e todos os leads dela da planilha. Não tem como desfazer, então baixe uma cópia da planilha antes se tiver dúvida.'}),el('div',{class:'scroll'},lt),
+    acts.append(del);
+    const modo=cur.length>1?(livres?'compartilhada · '+livres+' leads livres':'dividida · todos os leads têm dono'):'';
+    lt.append(el('tr',{},el('td',{},el('b',{text:L.n}),el('div',{class:'sub',text:L.seg+(L.by?' · criada por '+L.by:'')+(modo?' · '+modo:'')})),el('td',{text:n}),el('td',{},box),el('td',{},acts)))});
+  v.append(el('section',{class:'card'},el('h3',{text:'Listas'}),el('p',{class:'sub',style:'margin:0',text:'Marque um ou mais vendedores por lista. Com 2 ou mais a lista fica compartilhada: todos veem os leads livres e, quando alguém registra contato ou mexe num lead, ele vira dono e o lead some para os outros. Se preferir separar, use "Dividir" para repartir os leads livres igualmente. "Excluir lista" apaga a lista e todos os leads dela da planilha, sem volta.'}),el('div',{class:'scroll'},lt),
     el('div',{class:'actions'},(()=>{const b=el('button',{class:'btn pri',type:'button',text:'+ Importar lista'});b.onclick=()=>{setView('pros');openImp()};return b})())))}
 
 /* ================= navegação ================= */
@@ -486,7 +552,7 @@ let poll=null;
 async function start(){$('#vLogin').hidden=true;$('#tabs').hidden=false;$('#bOut').hidden=false;
   $('#meBox').replaceChildren('Olá, ',el('b',{text:ME.nome}),isG()?el('span',{class:'role',text:'GESTÃO'}):'');
   document.querySelector('[data-v=dash]').hidden=!isG();document.querySelector('[data-v=adm]').hidden=!isG();$('#bImp').hidden=!isG();
-  $('#fOw').hidden=!isG();$('#fMine').hidden=!isG();if(!isG()){F.ow='';F.mine=false}
+  $('#fOw').hidden=!isG();if(!isG())F.ow='';
   setView(isG()&&view!=='pros'?view:'pros');setSync('','Carregando a planilha…');
   try{const j=await call('load');ME=j.eu||ME;setData(j,true);loaded=true;syncUI();render();setSync('on',DEMO?'Demonstração (dados neste navegador)':'Conectado à planilha')}
   catch(e){setSync('off',e.message);$('#list').replaceChildren(el('div',{class:'empty',text:'Não consegui carregar a planilha: '+e.message}));return}
