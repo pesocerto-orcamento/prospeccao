@@ -162,6 +162,17 @@ table.t tr.tot td{font-weight:700;border-bottom:0}
 .vchip:has(input:checked){background:var(--brand-soft);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
 .vacts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 #vAdm table.t td{white-space:normal}
+#vRobo[hidden]{display:none!important}
+.robo-k{grid-template-columns:repeat(4,minmax(0,1fr))}
+.robo textarea{width:100%;resize:vertical;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace}
+#vRobo input[type=number],#vRobo input[type=url],#vRobo input[type=password],#vRobo .form input[type=text],#vRobo .form input[type=tel],#vRobo .form select{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+#vRobo label.chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:500}
+#vRobo label.chk input{width:18px;height:18px;accent-color:var(--brand-ink)}
+#vRobo .inl{display:flex;gap:6px;align-items:center}#vRobo .inl input{flex:1}
+#vRobo td.wrap{white-space:normal;text-align:left;min-width:260px}
+#vRobo .t th:last-child{text-align:left}
+.okt{color:var(--ok)!important}.badt{color:var(--bad)!important}
+@media (max-width:620px){.robo-k{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -171,6 +182,7 @@ table.t tr.tot td{font-weight:700;border-bottom:0}
     <button role="tab" data-v="pros" aria-selected="true" type="button">Prospecção</button>
     <button role="tab" data-v="dash" aria-selected="false" type="button" hidden>Dashboard</button>
     <button role="tab" data-v="adm" aria-selected="false" type="button" hidden>Equipe e listas</button>
+    <button role="tab" data-v="robo" aria-selected="false" type="button" hidden>Robô WhatsApp</button>
   </nav>
   <div class="spacer"></div>
   <div class="me" id="meBox"></div>
@@ -223,6 +235,7 @@ table.t tr.tot td{font-weight:700;border-bottom:0}
   </div>
   <div id="vDash" hidden></div>
   <div id="vAdm" hidden></div>
+  <div id="vRobo" hidden style="display:grid;gap:16px"></div>
 </main></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -478,7 +491,7 @@ function workdays(n){let c=0;for(let i=0;i<n;i++){const d=new Date();d.setDate(d
 function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set();for(let i=0;i<DP;i++){const d=new Date();d.setDate(d.getDate()-i);days.add(day(d))}
   const per=el('div',{class:'filters'},el('h2',{text:'Dashboard da gestão'}),el('span',{class:'spacer'}));
   [[1,'Hoje'],[7,'7 dias'],[30,'30 dias']].forEach(([n,l])=>{const b=el('button',{class:'chip',type:'button','aria-pressed':String(DP===n),text:l});b.onclick=()=>{DP=n;renderDash()};per.append(b)});v.append(per);
-  const names=[...TEAM(),'Sem responsável'];const R=Object.fromEntries(names.map(n=>[n,{n,lead:0,ctp:0,wg:0,vis:0,orc:0,won:0,due:0,ct:0}]));
+  const names=[...TEAM(),'Robô','Sem responsável'];const R=Object.fromEntries(names.map(n=>[n,{n,lead:0,ctp:0,wg:0,vis:0,orc:0,won:0,due:0,ct:0}]));
   LEADS.forEach(d=>{const os=owners(d);const r=os.length===1&&R[os[0]]?R[os[0]]:R['Sem responsável'];r.lead++;const s=st(d);if(s!=='Não contatado')r.ct++;if(s==='Visita agendada')r.vis++;if(['Orçamento enviado','Negociando'].includes(s))r.orc++;if(s==='Fechado')r.won++;if(isDue(d))r.due++;
     if(d.wgby&&days.has(d.wgday)&&R[d.wgby])R[d.wgby].wg++});
   ACT.forEach(a=>{if(a.acao==='Contato'&&days.has(a.day)&&R[a.by])R[a.by].ctp++});
@@ -486,7 +499,7 @@ function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set
   const k=el('div',{class:'kpis'});[[T.ctp,'Contatos no período'],[T.wg,'WhatsApps conseguidos'],[T.vis,'Visitas agendadas'],[T.orc,'Orçamento / negociação'],[T.won,'Fechados'],[T.due,'Follow-ups vencidos'],[LEADS.length?Math.round(T.ct/LEADS.length*100)+'%':'0%','Base já contatada']]
     .forEach(([x,l],i)=>k.append(el('div',{class:'kpi goal'+(i===5&&x?' alert':'')},el('b',{text:typeof x==='number'?x.toLocaleString('pt-BR'):x}),el('span',{text:l}))));v.append(k);
   const t=el('table',{class:'t'});t.append(el('tr',{},['Vendedor','Leads','Contatos','Meta ('+META+'/dia útil)','WhatsApps','Visitas','Orçam./negoc.','Fechados','Vencidos','Contatados'].map(h=>el('th',{text:h}))));
-  Object.values(R).forEach(r=>{if(r.n==='Sem responsável'&&!r.lead)return;const pct=r.n==='Sem responsável'?null:Math.round(r.ctp/meta*100);
+  Object.values(R).forEach(r=>{if(r.n==='Sem responsável'&&!r.lead)return;if(r.n==='Robô'&&!r.ctp)return;const pct=(r.n==='Sem responsável'||r.n==='Robô')?null:Math.round(r.ctp/meta*100);
     t.append(el('tr',{},el('td',{},el('b',{text:r.n==='Sem responsável'?'Sem dono / livres':r.n})),el('td',{text:r.lead}),el('td',{text:r.ctp}),el('td',{},pct==null?'—':el('span',{class:'pill '+(pct>=100?'ok':pct>=60?'warn':'bad'),text:pct+'%'})),
       el('td',{text:r.wg}),el('td',{text:r.vis}),el('td',{text:r.orc}),el('td',{text:r.won}),el('td',{},r.due?el('span',{class:'pill bad',text:r.due}):'0'),el('td',{text:r.lead?Math.round(r.ct/r.lead*100)+'%':'—'})))});
   t.append(el('tr',{class:'tot'},['Total',T.lead,T.ctp,'',T.wg,T.vis,T.orc,T.won,T.due,LEADS.length?Math.round(T.ct/LEADS.length*100)+'%':'—'].map(x=>el('td',{text:String(x)}))));
@@ -527,9 +540,97 @@ function renderAdm(){const v=$('#vAdm');v.replaceChildren();
   v.append(el('section',{class:'card'},el('h3',{text:'Listas'}),el('p',{class:'sub',style:'margin:0',text:'Marque um ou mais vendedores por lista. Com 2 ou mais a lista fica compartilhada: todos veem os leads livres e, quando alguém registra contato ou mexe num lead, ele vira dono e o lead some para os outros. Se preferir separar, use "Dividir" para repartir os leads livres igualmente. "Excluir lista" apaga a lista e todos os leads dela da planilha, sem volta.'}),el('div',{class:'scroll'},lt),
     el('div',{class:'actions'},(()=>{const b=el('button',{class:'btn pri',type:'button',text:'+ Importar lista'});b.onclick=()=>{setView('pros');openImp()};return b})())))}
 
+/* ================= robô whatsapp (Zap Data + Claude) ================= */
+let AUTO=null,autoLoading=false,autoBusy=false;
+const eligRobo=d=>st(d)==='Não contatado'&&!d.cd&&[d.w2,d.w,d.f].some(isCell);
+async function loadAuto(){autoLoading=true;try{AUTO=await call('autoGet')}catch(e){toast(e.message)}autoLoading=false;if(view==='robo')renderRobo()}
+function renderRobo(){const v=$('#vRobo');v.replaceChildren();
+  v.append(el('div',{class:'filters'},el('h2',{text:'Robô WhatsApp · Zap Data envia, Claude lê as respostas'})));
+  if(DEMO){v.append(el('div',{class:'note',text:'O robô só funciona com a planilha ligada (URL do Apps Script no config.js).'}));return}
+  if(!AUTO){v.append(el('div',{class:'empty',text:'Carregando a configuração do robô…'}));if(!autoLoading)loadAuto();return}
+  const C=Object.assign({},AUTO.cfg);const sel=new Set(C.listas||[]);
+  const prontos=id=>LEADS.filter(d=>d.l===id&&eligRobo(d)).length;
+  const fila=()=>[...sel].reduce((a,id)=>a+(LISTAS[id]?prontos(id):0),0);
+  // ---- status
+  const k=el('div',{class:'kpis robo-k'});
+  const kOn=el('div',{class:'kpi goal'+(C.ativo?'':' alert')},el('b',{text:C.ativo?'Ligado':'Desligado'}),el('span',{text:C.ativo?'roda a cada 15 min':'nada é enviado'}));
+  const kHoje=el('div',{class:'kpi goal'},el('b',{text:AUTO.enviadosHoje+' / '+C.limiteDia}),el('span',{text:'Enviados hoje'}),el('div',{class:'bar'},el('i',{style:'width:'+Math.min(100,Math.round(AUTO.enviadosHoje/Math.max(1,C.limiteDia)*100))+'%'})));
+  const kFila=el('div',{class:'kpi goal'},el('b',{}),el('span',{text:'Leads prontos nas listas marcadas'}));
+  const kDias=el('div',{class:'kpi goal'},el('b',{}),el('span',{text:'Dias úteis para zerar a fila'}));
+  const updFila=()=>{const n=fila();kFila.querySelector('b').textContent=n.toLocaleString('pt-BR');kDias.querySelector('b').textContent=n?String(Math.ceil(n/Math.max(1,Number(fLim.value)||C.limiteDia))):'—'};
+  k.append(kOn,kHoje,kFila,kDias);v.append(k);
+  if(C.ativo&&!AUTO.gatilho)v.append(el('div',{class:'note',text:'O robô está marcado como ligado, mas o gatilho de 15 em 15 minutos não existe. Clique em Salvar de novo; se continuar, rode a função autorizarRobo no Apps Script.'}));
+  // ---- listas
+  const lbox=el('div',{class:'vend'});
+  Object.values(LISTAS).forEach(L=>{const id='rl-'+L.id;const cb=el('input',{type:'checkbox',id});cb.checked=sel.has(L.id);
+    cb.onchange=()=>{cb.checked?sel.add(L.id):sel.delete(L.id);updFila()};
+    lbox.append(el('label',{for:id,class:'vchip'},cb,L.n+' · '+prontos(L.id)+' prontos'))});
+  v.append(el('section',{class:'card'},el('h3',{text:'1. Quais listas o robô vai prospectar'}),
+    el('p',{class:'sub',style:'margin:0',text:'"Prontos" = leads com status Não contatado, sem contato registrado e com celular. Telefone repetido ou já abordado em outro lead é pulado. Ordem: prioridade A, depois B e C; dentro de cada uma, mais avaliações no Google primeiro.'}),lbox));
+  // ---- limites
+  const num=(val,min,max)=>el('input',{type:'number',min:String(min),max:String(max),value:String(val),inputmode:'numeric'});
+  const hrs=(val,from,to)=>{const s=el('select',{});for(let h=from;h<=to;h++)s.append(el('option',{value:String(h),text:String(h).padStart(2,'0')+':00'}));s.value=String(val);return s};
+  const fOn=el('input',{type:'checkbox',id:'rOn'});fOn.checked=!!C.ativo;
+  const fLim=num(C.limiteDia,1,200);fLim.oninput=updFila;const fRod=num(C.porRodada,1,6);
+  const fIni=hrs(C.horaIni,0,23),fFim=hrs(C.horaFim,1,24);
+  const fDu=el('input',{type:'checkbox',id:'rDu'});fDu.checked=!!C.diasUteis;
+  const fAss=el('input',{type:'text',value:C.assinatura||'',placeholder:'Pedro'});
+  const ritmo=el('p',{class:'sub full',style:'margin:0'});
+  const updRitmo=()=>{const r=Math.max(1,Number(fRod.value)||1),l=Math.max(1,Number(fLim.value)||1),h=Math.max(0,Number(fFim.value)-Number(fIni.value));const cap=h*4*r;
+    ritmo.textContent='No ritmo de '+r+' por rodada (4 rodadas por hora), cabem até '+cap+' mensagens entre '+fIni.value+'h e '+fFim.value+'h. '+(cap<l?'Atenção: isso é menos que o limite do dia, então o limite real fica em '+cap+'.':'O limite de '+l+' por dia será atingido antes disso.')+' Entre uma mensagem e outra o robô espera de 15 a 45 segundos, para não parecer disparo em massa.'};
+  [fRod,fLim,fIni,fFim].forEach(x=>x.addEventListener('input',updRitmo));
+  const lim=el('div',{class:'form'},
+    el('label',{class:'full chk'},fOn,el('span',{},el('b',{text:'Robô ligado'}),' · envia sozinho dentro do horário e do limite abaixo')),
+    el('label',{},'Limite de mensagens por dia',fLim),el('label',{},'Mensagens por rodada (1 a 6)',fRod),el('label',{},'Nome que assina quando o lead não tem responsável',fAss),
+    el('label',{},'Começa às',fIni),el('label',{},'Para às',fFim),el('label',{class:'chk'},fDu,el('span',{text:'Só de segunda a sexta'})),ritmo);
+  v.append(el('section',{class:'card'},el('h3',{text:'2. Limites para não travar o número'}),
+    el('p',{class:'sub',style:'margin:0',text:'Número novo: comece com 20 a 30 por dia e suba aos poucos se as respostas forem boas. Se o Zap Data der erro 3 vezes seguidas, o robô se desliga sozinho e avisa no histórico.'}),lim));
+  // ---- mensagem
+  const fMsg=el('textarea',{rows:'9'});fMsg.value=C.mensagens||'';
+  v.append(el('section',{class:'card robo'},el('h3',{text:'3. Mensagem de abertura'}),
+    el('p',{class:'sub',style:'margin:0',text:'Escreva 2 ou 3 versões separadas por uma linha só com --- . O robô sorteia uma para cada lead (texto igual para todo mundo é o que mais trava número). Pode usar: {oi} = "Oi, Maria" ou "Olá" · {nome} = nome do estabelecimento · {vendedor} = responsável do lead (ou o nome que assina) · {cidade} · {tipo}. Sem link na primeira mensagem.'}),fMsg));
+  // ---- zap data
+  const fUrl=el('input',{type:'url',value:C.url||'',placeholder:'https://… (endereço da API do Zap Data para enviar mensagem ou iniciar fluxo)'});
+  const fHn=el('input',{type:'text',value:C.headerNome||'',placeholder:'Authorization'});
+  const fTk=el('input',{type:'password',autocomplete:'off',placeholder:AUTO.temToken?'•••••• já salvo (deixe vazio para manter)':'Cole o token da API do Zap Data'});
+  const fBody=el('textarea',{rows:'6'});fBody.value=C.corpo||'';
+  const fTel=el('input',{type:'tel',placeholder:'Seu celular, ex.: (24) 99999-9999'});const bTeste=el('button',{class:'btn',type:'button',text:'Enviar teste para mim'});
+  const tRes=el('div',{class:'sub full'});
+  v.append(el('section',{class:'card robo'},el('h3',{text:'4. Conexão com o Zap Data (envio)'}),
+    el('p',{class:'sub',style:'margin:0',text:'Pegue esses dados na parte de API / Integrações do Zap Data. No corpo, use {telefone} (55 + DDD + número) e {mensagem}; dá para usar também {nome}, {id}, {vendedor}. Se o Zap Data dispara um fluxo em vez de texto, troque o corpo pelo formato que ele pede.'}),
+    el('div',{class:'form'},el('label',{class:'full'},'URL da API',fUrl),el('label',{},'Nome do cabeçalho de autenticação',fHn),el('label',{},'Token / chave',fTk),
+      el('label',{class:'full'},'Corpo da requisição (JSON)',fBody),el('label',{},'Testar envio',fTel),el('div',{class:'actions',style:'align-self:end;justify-content:flex-start'},bTeste),tRes)));
+  // ---- respostas
+  const hook=URL_API+(URL_API.includes('?')?'&':'?')+'key='+AUTO.hook;
+  const fHook=el('input',{type:'text',readonly:'readonly',value:hook});
+  const fCk=el('input',{type:'password',autocomplete:'off',placeholder:AUTO.temClaude?'•••••• já salva (deixe vazio para manter)':'sk-ant-… (console.anthropic.com)'});
+  const fMod=el('input',{type:'text',value:C.modelo||'',placeholder:'claude-haiku-5-5'});
+  v.append(el('section',{class:'card robo'},el('h3',{text:'5. Respostas dos clientes (Zap Data → planilha)'}),
+    el('p',{class:'sub',style:'margin:0',text:'No fluxo do Zap Data, depois que o cliente responder, coloque um bloco de Webhook / Requisição HTTP (método POST) para o endereço abaixo, mandando o telefone e a mensagem do cliente. O Claude lê, muda o status (Respondeu, Visita agendada, Sem interesse ou Contato inválido), escreve o resumo nas Anotações e põe follow-up para hoje, para o vendedor assumir. Lead que já está em visita, orçamento, negociação ou fechado não tem o status mexido, só ganha a anotação. Sem a chave do Claude, o robô usa uma regra simples de palavras.'}),
+    el('div',{class:'form'},el('label',{class:'full'},'Endereço do webhook (cole no Zap Data) · não compartilhe',el('span',{class:'inl'},fHook,cpBtn(hook))),
+      el('label',{},'Chave da API do Claude',fCk),el('label',{},'Modelo do Claude',fMod))));
+  // ---- ações
+  const bSave=el('button',{class:'btn pri',type:'button',text:'Salvar configuração'});const bRun=el('button',{class:'btn',type:'button',text:'Rodar agora (até 3 envios)'});
+  const coletar=()=>({cfg:{ativo:fOn.checked,listas:[...sel].filter(id=>LISTAS[id]),limiteDia:+fLim.value,porRodada:+fRod.value,horaIni:+fIni.value,horaFim:+fFim.value,diasUteis:fDu.checked,assinatura:fAss.value,
+    mensagens:fMsg.value,url:fUrl.value,headerNome:fHn.value,corpo:fBody.value,modelo:fMod.value},zapToken:fTk.value.trim(),claude:fCk.value.trim()});
+  const busy=(b,t)=>{autoBusy=!!t;[bSave,bRun,bTeste].forEach(x=>x.disabled=!!t);if(t)b.textContent=t};
+  bSave.onclick=async()=>{busy(bSave,'Salvando…');try{AUTO=await call('autoSave',coletar());toast(AUTO.cfg.ativo?'Salvo · robô ligado':'Salvo · robô desligado');renderRobo()}catch(e){toast(e.message);busy(bSave,'');bSave.textContent='Salvar configuração'}};
+  bRun.onclick=async()=>{busy(bRun,'Salvando e enviando… (até 30 s)');try{await call('autoSave',coletar());const j=await call('autoRun');AUTO=j;toast('Rodada: '+((j.rodada&&j.rodada.msg)||'ok'));await reload();renderRobo()}catch(e){toast(e.message);busy(bRun,'');bRun.textContent='Rodar agora (até 3 envios)'}};
+  bTeste.onclick=async()=>{if(!fTel.value.trim()){toast('Digite seu celular');return}busy(bTeste,'Enviando teste…');
+    try{const p=coletar();const j=await call('autoTest',{cfg:p.cfg,tel:fTel.value});tRes.textContent=(j.enviado?'✔ O Zap Data aceitou ('+j.resposta+'). Confira se chegou no seu WhatsApp: ':'✖ Não foi: '+j.resposta+' · Mensagem que seria enviada: ')+j.mensagem;tRes.className='sub full '+(j.enviado?'okt':'badt');if(!j.enviado)toast('O Zap Data recusou. Veja o motivo abaixo do botão.')}
+    catch(e){toast(e.message)}busy(bTeste,'');bTeste.textContent='Enviar teste para mim';bSave.textContent='Salvar configuração';bRun.textContent='Rodar agora (até 3 envios)'};
+  v.append(el('div',{class:'actions'},bRun,bSave));
+  // ---- histórico
+  const t=el('table',{class:'t'});t.append(el('tr',{},['Quando','Tipo','Lead','Telefone','Detalhe'].map(h=>el('th',{text:h}))));
+  (AUTO.log||[]).forEach(r=>t.append(el('tr',{},el('td',{text:r.dia.split('-').reverse().slice(0,2).join('/')+' '+r.hora}),el('td',{},el('span',{class:'pill '+(r.tipo==='Erro'?'bad':r.tipo==='Resposta'?'ok':r.tipo==='Config'?'warn':''),text:r.tipo})),el('td',{text:r.nome||'—'}),el('td',{text:fmtPhone(String(r.tel||'').replace(/^'/,''))}),el('td',{class:'wrap',text:r.det}))));
+  const rb=el('button',{class:'btn',type:'button',text:'Atualizar'});rb.onclick=()=>{AUTO=null;renderRobo()};
+  v.append(el('section',{class:'card'},el('div',{class:'sechead'},el('h3',{text:'Histórico do robô'}),el('span',{class:'spacer'}),rb),
+    AUTO.log&&AUTO.log.length?el('div',{class:'scroll'},t):el('p',{class:'sub',style:'margin:0',text:'Nada ainda. Tudo o que o robô fizer aparece aqui e na aba "Robô" da planilha.'})));
+  updFila();updRitmo()}
+
 /* ================= navegação ================= */
-function render(){ls.set('pc-f3',F);if(view==='pros')renderPros();else if(view==='dash')renderDash();else if(view==='adm')renderAdm()}
-function setView(v){if(v!=='pros'&&!isG())v='pros';view=v;document.querySelectorAll('#tabs [role=tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.v===v)));$('#vPros').hidden=v!=='pros';$('#vDash').hidden=v!=='dash';$('#vAdm').hidden=v!=='adm';render()}
+function render(){ls.set('pc-f3',F);if(view==='pros')renderPros();else if(view==='dash')renderDash();else if(view==='adm')renderAdm();else if(view==='robo')renderRobo()}
+function setView(v){if(v!=='pros'&&!isG())v='pros';view=v;document.querySelectorAll('#tabs [role=tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.v===v)));$('#vPros').hidden=v!=='pros';$('#vDash').hidden=v!=='dash';$('#vAdm').hidden=v!=='adm';$('#vRobo').hidden=v!=='robo';if(v==='robo')AUTO=null;render()}
 function syncUI(){cities();$('#q').value=F.q;$('#fPrio').value=F.p;$('#fSt').value=F.st;$('#fOw').value=F.ow;[['#fW','w'],['#fNoW','now'],['#fDue','due'],['#fMine','mine']].forEach(([s,k])=>$(s).setAttribute('aria-pressed',String(!!F[k])))}
 function setSync(c,t){$('#dot').className='dot '+(c==='busy'?'':c);$('#syncTxt').textContent=t}
 document.querySelectorAll('#tabs [role=tab]').forEach(b=>b.onclick=()=>setView(b.dataset.v));
@@ -540,7 +641,7 @@ $('#fW').onclick=()=>{F.w=!F.w;if(F.w)F.now=false;syncUI();render()};$('#fNoW').
 $('#more').onclick=()=>{page+=100;render()};$('#bNew').onclick=openNew;$('#bImp').onclick=openImp;$('#bOut').onclick=()=>logout(false);
 
 /* ================= login / carga ================= */
-function showLogin(msg){$('#vLogin').hidden=false;$('#vPros').hidden=true;$('#vDash').hidden=true;$('#vAdm').hidden=true;$('#tabs').hidden=true;$('#bOut').hidden=true;$('#meBox').textContent='';
+function showLogin(msg){$('#vLogin').hidden=false;$('#vPros').hidden=true;$('#vDash').hidden=true;$('#vAdm').hidden=true;$('#vRobo').hidden=true;$('#tabs').hidden=true;$('#bOut').hidden=true;$('#meBox').textContent='';
   const s=$('#lgNome');s.replaceChildren(el('option',{value:'',text:'Escolha'}));(EQUIPE.length?EQUIPE.map(x=>x.nome):['João','Rafa','José','Marcela','Pedro']).forEach(n=>s.append(el('option',{value:n,text:n})));
   $('#lgErr').textContent=msg||'';$('#lgHint').textContent=DEMO?'MODO DEMONSTRAÇÃO · PIN de todos: 1234. Os dados ficam só neste navegador. Os PINs da planilha passam a valer depois de colar a URL do Apps Script no config.js.':'Seu PIN está na aba Equipe da planilha; peça ao Pedro.';setSync('',DEMO?'Demonstração':'')}
 function logout(expired){TOKEN='';ME={};ls.del('pc-token');ls.del('pc-me');ls.del('pc-demo-user');loaded=false;showLogin(expired?'Sua sessão expirou. Entre de novo.':'')}
@@ -551,13 +652,13 @@ async function reload(){const j=await call('load');setData(j,true);loaded=true;r
 let poll=null;
 async function start(){$('#vLogin').hidden=true;$('#tabs').hidden=false;$('#bOut').hidden=false;
   $('#meBox').replaceChildren('Olá, ',el('b',{text:ME.nome}),isG()?el('span',{class:'role',text:'GESTÃO'}):'');
-  document.querySelector('[data-v=dash]').hidden=!isG();document.querySelector('[data-v=adm]').hidden=!isG();$('#bImp').hidden=!isG();
+  document.querySelector('[data-v=dash]').hidden=!isG();document.querySelector('[data-v=adm]').hidden=!isG();document.querySelector('[data-v=robo]').hidden=!isG();$('#bImp').hidden=!isG();
   $('#fOw').hidden=!isG();if(!isG())F.ow='';
   setView(isG()&&view!=='pros'?view:'pros');setSync('','Carregando a planilha…');
   try{const j=await call('load');ME=j.eu||ME;setData(j,true);loaded=true;syncUI();render();setSync('on',DEMO?'Demonstração (dados neste navegador)':'Conectado à planilha')}
   catch(e){setSync('off',e.message);$('#list').replaceChildren(el('div',{class:'empty',text:'Não consegui carregar a planilha: '+e.message}));return}
   clearInterval(poll);if(!DEMO)poll=setInterval(async()=>{if(document.hidden||!TOKEN)return;
-    try{const j=await call('changes',{since:SINCE-5000});const a=document.activeElement;setData(j,false);if(!(a&&a.closest&&a.closest('#list,#newCard,#impCard')&&a.matches('textarea,input,select')))render();setSync('on','Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))}catch(e){setSync('off','Sem conexão com a planilha')}},Math.max(20,Number(CFGX.ATUALIZAR_A_CADA_SEGUNDOS||60))*1000)}
+    try{const j=await call('changes',{since:SINCE-5000});const a=document.activeElement;setData(j,false);if(view!=='robo'&&!(a&&a.closest&&a.closest('#list,#newCard,#impCard')&&a.matches('textarea,input,select')))render();setSync('on','Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))}catch(e){setSync('off','Sem conexão com a planilha')}},Math.max(20,Number(CFGX.ATUALIZAR_A_CADA_SEGUNDOS||60))*1000)}
 if(DEMO){$('#ro').textContent='Modo demonstração: falta colar a URL da planilha no config.js. Nada do que for feito aqui chega no time.';$('#ro').hidden=false}
 (async()=>{if(TOKEN&&ME.nome){await start()}else showLogin()})();
 </script>
