@@ -362,13 +362,14 @@ function detail(d){const cur=st(d);const dl=el('dl',{class:'detail'});const item
   if(d.a||d.b)dl.append(item('Endereço',[d.a,d.b,d.c].filter(Boolean).join(' – ')));
   if(d.e)dl.append(item('E-mail',el('span',{},d.e,cpBtn(d.e))));
   if(d.ig)dl.append(item('Instagram',el('a',{href:'https://www.instagram.com/'+d.ig.replace(/^@/,'')+'/',target:'_blank',rel:'noopener',text:d.ig})));
+  if(d.iglink)dl.append(item('Link da bio',d.iglink));
   if(d.ct)dl.append(item('Contato',d.ct));if(d.sg)dl.append(item('Segmento',d.sg));if(d.g)dl.append(item('Avaliações no Google',String(d.g)));
   dl.append(item('Lista',(LISTAS[d.l]||{}).n||''));if(d.o)dl.append(item('Observações',d.o,'full'));
   const c2=el('input',{type:'text',id:'c2-'+d.k,value:d.c2||'',placeholder:'Nome e cargo de quem decide'});c2.onchange=()=>save(d,{c2:c2.value});
   const w2=el('input',{type:'tel',id:'w2-'+d.k,value:d.w2||'',placeholder:'(24) 9xxxx-xxxx'});w2.onchange=()=>save(d,{w2:fmtPhone(w2.value)});
   const ORIG=['','Bio do Instagram','Link da bio','Direct Instagram','Google','Ligação','Indicação','Outro'];
   const og=el('select',{id:'og-'+d.k});ORIG.forEach(x=>og.append(el('option',{value:x,text:x||'—'})));og.value=d.wgsrc||'';og.onchange=()=>save(d,{wgsrc:og.value});
-  const IGS=['','Verificado sem WhatsApp','WhatsApp coletado','Direct enviado','Respondeu no Direct'];
+  const IGS=['','Link pendente','Link não verificado','Verificado sem WhatsApp','WhatsApp coletado','Direct enviado','Respondeu no Direct'];
   const ie=el('select',{id:'ie-'+d.k});IGS.forEach(x=>ie.append(el('option',{value:x,text:x||'—'})));ie.value=d.igst||'';ie.onchange=()=>save(d,{igst:ie.value});
   const nt=el('textarea',{id:'nt-'+d.k,placeholder:'O que foi conversado, próximo passo…'});nt.value=d.nt||'';nt.onchange=()=>save(d,{nt:nt.value});
   const btn=el('button',{class:'btn pri',type:'button',text:d.cd===today()?'Contato de hoje registrado':'Registrar contato de hoje'});btn.disabled=d.cd===today();btn.onclick=()=>save(d,{},true);
