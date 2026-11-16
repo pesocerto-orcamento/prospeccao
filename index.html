@@ -296,7 +296,7 @@ let F=Object.assign({l:'',q:'',c:'',p:'',st:'',ow:'',w:false,now:false,due:false
 const isG=()=>ME.perfil==='Gestão';
 const TEAM=()=>EQUIPE.map(x=>x.nome);
 function setData(j,full){
-  if(j.equipe)EQUIPE=j.equipe;
+  if(j.equipe){EQUIPE=j.equipe;try{ls.set('pc-nomes',j.equipe.map(x=>x.nome))}catch(e){}}
   LISTAS={};(j.listas||[]).forEach(x=>LISTAS[x.id]=x);
   if(full){LEADS=j.leads||[];BYK={};LEADS.forEach(d=>BYK[d.k]=d)}
   else{(j.leads||[]).forEach(d=>{if(BYK[d.k])Object.keys(BYK[d.k]).forEach(k=>{if(!(k in d))delete BYK[d.k][k]}),Object.assign(BYK[d.k],d);else{LEADS.push(d);BYK[d.k]=d}})}
@@ -663,7 +663,7 @@ $('#more').onclick=()=>{page+=100;render()};$('#bNew').onclick=openNew;$('#bImp'
 
 /* ================= login / carga ================= */
 function showLogin(msg){$('#vLogin').hidden=false;$('#vPros').hidden=true;$('#vDash').hidden=true;$('#vAdm').hidden=true;$('#vRobo').hidden=true;$('#tabs').hidden=true;$('#bOut').hidden=true;$('#meBox').textContent='';
-  const s=$('#lgNome');s.replaceChildren(el('option',{value:'',text:'Escolha'}));(EQUIPE.length?EQUIPE.map(x=>x.nome):['João','Rafa','José','Marcela','Pedro']).forEach(n=>s.append(el('option',{value:n,text:n})));
+  const s=$('#lgNome');s.replaceChildren(el('option',{value:'',text:'Escolha'}));(EQUIPE.length?EQUIPE.map(x=>x.nome):(ls.get('pc-nomes',null)||['João','Rafa','José','Marcela','Pedro','Agência Peso Certo'])).forEach(n=>s.append(el('option',{value:n,text:n})));
   $('#lgErr').textContent=msg||'';$('#lgHint').textContent=DEMO?'MODO DEMONSTRAÇÃO · PIN de todos: 1234. Os dados ficam só neste navegador. Os PINs da planilha passam a valer depois de colar a URL do Apps Script no config.js.':'Seu PIN está na aba Equipe da planilha; peça ao Pedro.';setSync('',DEMO?'Demonstração':'')}
 function logout(expired){TOKEN='';ME={};ls.del('pc-token');ls.del('pc-me');ls.del('pc-demo-user');loaded=false;showLogin(expired?'Sua sessão expirou. Entre de novo.':'')}
 $('#fLogin').onsubmit=async e=>{e.preventDefault();const b=$('#lgBtn');b.disabled=true;b.textContent='Entrando…';$('#lgErr').textContent='';
