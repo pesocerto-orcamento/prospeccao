@@ -397,7 +397,7 @@ function renderPros(){kpis();listCards();cities();
 /* ================= salvar ================= */
 let chain=Promise.resolve();
 function save(d,fields,contact){
-  const prev=Object.assign({},d);Object.assign(d,fields);if(contact&&d.cd!==today()){d.cd=today();if(st(d)==='Não contatado'&&!fields.st)d.st='1º contato feito';ACT.push({day:today(),by:ME.nome,k:d.k,l:d.l,acao:'Contato',st:d.st})}
+  const prev=Object.assign({},d);Object.assign(d,fields);if(contact&&d.cd!==today()){d.cd=today();if(st(d)==='Não contatado'&&!fields.st)d.st='1º contato feito';ACT.push({day:today(),h:new Date().toTimeString().slice(0,5),by:ME.nome,k:d.k,l:d.l,acao:'Contato',st:d.st})}else if(fields.st&&st(d)!==st(prev))ACT.push({day:today(),h:new Date().toTimeString().slice(0,5),by:ME.nome,k:d.k,l:d.l,acao:'Mudou status',st:st(d)});
   d.by=ME.nome;d.at=String(Date.now());
   const a=document.activeElement;if(!a||!a.matches('textarea,input[type=text],input[type=tel]'))render();
   setSync('busy','Salvando…');
@@ -498,17 +498,17 @@ let DP=7;
 let DV=null,DDAY='';
 function workdays(n){let c=0;for(let i=0;i<n;i++){const d=new Date();d.setDate(d.getDate()-i);const w=d.getDay();if(w!==0&&w!==6)c++}return Math.max(1,c)}
 function DVsec(v,R,days){const V=DV;if(!V||!R[V])return;if(!document.getElementById('dvCss'))document.head.append(el('style',{id:'dvCss',text:'#dvDet td,#dvDet th{text-align:left;vertical-align:top;white-space:normal}#dvDet td:nth-child(4){min-width:200px;max-width:280px}#dvDet td:nth-child(6){min-width:180px;max-width:300px;word-break:break-word}#dvDet td:nth-child(3){max-width:220px}'}));
-  const LK=new Map(LEADS.map(x=>[x.k,x]));const M=new Map();const add=(k,t)=>{const d=LK.get(k);if(!d)return;if(!M.has(k))M.set(k,{d,acts:new Set()});M.get(k).acts.add(t)};
-  ACT.forEach(a=>{if(a.by===V&&days.has(a.day))add(a.k,a.acao+(a.st?' → '+a.st:''))});
+  const LK=new Map(LEADS.map(x=>[x.k,x]));const M=new Map();const add=(k,t,h)=>{const d=LK.get(k);if(!d)return;if(!M.has(k))M.set(k,{d,acts:new Set(),h:''});const m=M.get(k);m.acts.add(t);if(h&&h>m.h)m.h=h};
+  ACT.forEach(a=>{if(a.by===V&&days.has(a.day))add(a.k,a.acao+(a.st?' → '+a.st:''),a.h?a.day+' '+a.h:'')});
   LEADS.forEach(d=>{if(d.by===V&&d.at&&days.has(day(new Date(+d.at))))add(d.k,'Atualizou o lead')});
   LEADS.forEach(d=>{if(d.wgby===V&&days.has(d.wgday))add(d.k,'Conseguiu WhatsApp')});
   const ADV=['Respondeu','Visita agendada','Orçamento enviado','Negociando','Fechado'];
-  const rows=[...M.values()].sort((a,b)=>(+b.d.at||0)-(+a.d.at||0));
+  const inP=d=>d.at&&days.has(day(new Date(+d.at)));const kt=r=>inP(r.d)?+r.d.at:(r.h?Date.parse(r.h.replace(' ','T')):0);const rows=[...M.values()].sort((a,b)=>kt(b)-kt(a));
   const nAdv=rows.filter(r=>ADV.includes(st(r.d))).length;
-  const hr=d=>{if(!d.at)return '—';const t=new Date(+d.at);if(!days.has(day(t)))return '—';return (days.size>1?String(t.getDate()).padStart(2,'0')+'/'+String(t.getMonth()+1).padStart(2,'0')+' ':'')+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')};
+  const hr=r=>{const d=r.d;if(!inP(d)){if(!r.h)return '—';const p=r.h.split(' ');return (days.size>1?p[0].slice(8)+'/'+p[0].slice(5,7)+' ':'')+p[1]}const t=new Date(+d.at);return (days.size>1?String(t.getDate()).padStart(2,'0')+'/'+String(t.getMonth()+1).padStart(2,'0')+' ':'')+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')};
   const t=el('table',{class:'t'});t.append(el('tr',{},['Hora','Lead','Cidade / lista','O que fez','Situação atual','Última anotação','WhatsApp'].map(h=>el('th',{text:h}))));
-  rows.forEach(({d,acts})=>{const s0=st(d);const dg=String(d.w||d.w2||'').replace(/\D/g,'');const nt=String(d.nt||'').trim().split('\n').filter(Boolean).pop()||'';
-    t.append(el('tr',{},el('td',{text:hr(d)}),el('td',{},el('b',{text:d.n||d.k}),d.t?el('div',{class:'sub',text:d.t}):null),el('td',{text:[d.c,(LISTAS[d.l]||{}).n].filter(Boolean).join(' · ')}),
+  rows.forEach(r=>{const {d,acts}=r;const s0=st(d);const dg=String(d.w||d.w2||'').replace(/\D/g,'');const nt=String(d.nt||'').trim().split('\n').filter(Boolean).pop()||'';
+    t.append(el('tr',{},el('td',{text:hr(r)}),el('td',{},el('b',{text:d.n||d.k}),d.t?el('div',{class:'sub',text:d.t}):null),el('td',{text:[d.c,(LISTAS[d.l]||{}).n].filter(Boolean).join(' · ')}),
       el('td',{text:[...acts].join(' · ')}),el('td',{},el('span',{class:'pill '+(ADV.includes(s0)?'ok':s0==='Não contatado'?'bad':'warn'),text:s0})),
       el('td',{text:nt.length>140?nt.slice(0,140)+'…':nt}),el('td',{},dg.length>=10?el('a',{href:'https://wa.me/'+(dg.startsWith('55')&&dg.length>11?dg:'55'+dg),target:'_blank',rel:'noopener',text:fmtPhone?fmtPhone(dg):dg}):'—')))});
   const close=el('button',{type:'button',class:'chip',text:'Fechar ✕'});close.onclick=()=>{DV=null;renderDash()};
