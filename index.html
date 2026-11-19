@@ -673,7 +673,7 @@ function renderRobo(){const v=$('#vRobo');v.replaceChildren();
 
 /* ================= navegação ================= */
 function metaBar(){let bar=document.getElementById('metaBar');
-  if(typeof ME==='undefined'||!ME||!ME.nome){if(bar)bar.hidden=true;return}
+  if(typeof ME==='undefined'||!ME||!ME.nome||!LEADS.length||!EQUIPE.length){if(bar)bar.hidden=true;return}
   if(!bar){bar=el('div',{id:'metaBar',role:'status'});const hd=document.querySelector('header.top');if(hd)hd.after(bar);else document.body.prepend(bar);
     document.head.append(el('style',{text:'#metaBar{position:sticky;top:0;z-index:50;padding:12px 16px;font:600 15px/1.35 system-ui,sans-serif;text-align:center;color:#fff}#metaBar.red{background:#c62828;animation:mbPulse 1.6s ease-in-out infinite}#metaBar.orange{background:#e07b00}#metaBar.green{background:#1a7f37}#metaBar small{display:block;font-weight:400;font-size:13px;opacity:.95;margin-top:2px}#metaBar .mbt{display:block;height:6px;background:rgba(255,255,255,.3);border-radius:4px;margin:8px auto 0;max-width:520px;overflow:hidden}#metaBar .mbt i{display:block;height:100%;background:#fff}@keyframes mbPulse{0%,100%{box-shadow:inset 0 0 0 0 rgba(255,255,255,0)}50%{box-shadow:inset 0 0 0 4px rgba(255,255,255,.55)}}'}))}
   const now=new Date(),dw=now.getDay(),h=now.getHours()+now.getMinutes()/60;
@@ -689,7 +689,7 @@ function metaBar(){let bar=document.getElementById('metaBar');
   else if(mine<esp){bar.className='red';bar.replaceChildren(el('span',{text:'⚠️ META NÃO ATINGIDA — você fez '+mine+' de '+META+' contatos hoje'}),el('small',{text:'Faltam '+falta+'. Pelo horário, já deveria ter pelo menos '+esp+'. Bora prospectar!'}),trilha)}
   else{bar.className='orange';bar.replaceChildren(el('span',{text:'🎯 Meta do dia: '+mine+' de '+META+' contatos'}),el('small',{text:'Faltam '+falta+' — você está no ritmo, continue.'}),trilha)}
   bar.hidden=false}
-setInterval(()=>{try{metaBar()}catch(e){}},60000);
+setInterval(()=>{try{metaBar()}catch(e){}},15000);
 function render(){ls.set('pc-f3',F);try{metaBar()}catch(e){}if(view==='pros')renderPros();else if(view==='dash')renderDash();else if(view==='adm')renderAdm();else if(view==='robo')renderRobo()}
 function setView(v){if(v!=='pros'&&!isG())v='pros';view=v;document.querySelectorAll('#tabs [role=tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.v===v)));$('#vPros').hidden=v!=='pros';$('#vDash').hidden=v!=='dash';$('#vAdm').hidden=v!=='adm';$('#vRobo').hidden=v!=='robo';if(v==='robo')AUTO=null;render()}
 function syncUI(){cities();$('#q').value=F.q;$('#fPrio').value=F.p;$('#fSt').value=F.st;$('#fOw').value=F.ow;[['#fW','w'],['#fNoW','now'],['#fDue','due'],['#fMine','mine']].forEach(([s,k])=>$(s).setAttribute('aria-pressed',String(!!F[k])))}
