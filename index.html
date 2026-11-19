@@ -495,10 +495,31 @@ function openImp(){const c=$('#impCard');if(!c.hidden){c.hidden=true;return}c.re
 
 /* ================= dashboard ================= */
 let DP=7;
+let DV=null,DDAY='';
 function workdays(n){let c=0;for(let i=0;i<n;i++){const d=new Date();d.setDate(d.getDate()-i);const w=d.getDay();if(w!==0&&w!==6)c++}return Math.max(1,c)}
-function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set();for(let i=0;i<DP;i++){const d=new Date();d.setDate(d.getDate()-i);days.add(day(d))}
+function DVsec(v,R,days){const V=DV;if(!V||!R[V])return;if(!document.getElementById('dvCss'))document.head.append(el('style',{id:'dvCss',text:'#dvDet td,#dvDet th{text-align:left;vertical-align:top;white-space:normal}#dvDet td:nth-child(4){min-width:200px;max-width:280px}#dvDet td:nth-child(6){min-width:180px;max-width:300px;word-break:break-word}#dvDet td:nth-child(3){max-width:220px}'}));
+  const LK=new Map(LEADS.map(x=>[x.k,x]));const M=new Map();const add=(k,t)=>{const d=LK.get(k);if(!d)return;if(!M.has(k))M.set(k,{d,acts:new Set()});M.get(k).acts.add(t)};
+  ACT.forEach(a=>{if(a.by===V&&days.has(a.day))add(a.k,a.acao+(a.st?' → '+a.st:''))});
+  LEADS.forEach(d=>{if(d.by===V&&d.at&&days.has(day(new Date(+d.at))))add(d.k,'Atualizou o lead')});
+  LEADS.forEach(d=>{if(d.wgby===V&&days.has(d.wgday))add(d.k,'Conseguiu WhatsApp')});
+  const ADV=['Respondeu','Visita agendada','Orçamento enviado','Negociando','Fechado'];
+  const rows=[...M.values()].sort((a,b)=>(+b.d.at||0)-(+a.d.at||0));
+  const nAdv=rows.filter(r=>ADV.includes(st(r.d))).length;
+  const hr=d=>{if(!d.at)return '—';const t=new Date(+d.at);if(!days.has(day(t)))return '—';return (days.size>1?String(t.getDate()).padStart(2,'0')+'/'+String(t.getMonth()+1).padStart(2,'0')+' ':'')+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')};
+  const t=el('table',{class:'t'});t.append(el('tr',{},['Hora','Lead','Cidade / lista','O que fez','Situação atual','Última anotação','WhatsApp'].map(h=>el('th',{text:h}))));
+  rows.forEach(({d,acts})=>{const s0=st(d);const dg=String(d.w||d.w2||'').replace(/\D/g,'');const nt=String(d.nt||'').trim().split('\n').filter(Boolean).pop()||'';
+    t.append(el('tr',{},el('td',{text:hr(d)}),el('td',{},el('b',{text:d.n||d.k}),d.t?el('div',{class:'sub',text:d.t}):null),el('td',{text:[d.c,(LISTAS[d.l]||{}).n].filter(Boolean).join(' · ')}),
+      el('td',{text:[...acts].join(' · ')}),el('td',{},el('span',{class:'pill '+(ADV.includes(s0)?'ok':s0==='Não contatado'?'bad':'warn'),text:s0})),
+      el('td',{text:nt.length>140?nt.slice(0,140)+'…':nt}),el('td',{},dg.length>=10?el('a',{href:'https://wa.me/'+(dg.startsWith('55')&&dg.length>11?dg:'55'+dg),target:'_blank',rel:'noopener',text:fmtPhone?fmtPhone(dg):dg}):'—')))});
+  const close=el('button',{type:'button',class:'chip',text:'Fechar ✕'});close.onclick=()=>{DV=null;renderDash()};
+  v.append(el('section',{class:'card',id:'dvDet'},el('div',{class:'filters'},el('h3',{style:'margin:0',text:(V==='Sem responsável'?'Sem dono':V)+' · '+PLBL()}),el('span',{class:'spacer'}),close),
+    el('p',{class:'sub',style:'margin:0 0 8px',text:rows.length+' leads mexidos · '+nAdv+' com avanço (respondeu, visita, orçamento, negociando ou fechado) · '+(R[V].ctp||0)+' contatos · '+(R[V].wg||0)+' WhatsApps'}),
+    rows.length?el('div',{class:'scroll'},t):el('p',{class:'sub',text:'Nenhuma atividade registrada no período.'}),
+    el('p',{class:'sub',style:'margin:8px 0 0',text:'Mostra contatos e respostas da aba Atividade e os leads que esta pessoa editou por último. Se outra pessoa editou o mesmo lead depois, a edição aparece para ela.'})))}
+function PLBL(){return DDAY?'dia '+DDAY.slice(8)+'/'+DDAY.slice(5,7):DP===1?'hoje':'últimos '+DP+' dias'}
+function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set();for(let i=0;i<DP;i++){const d=new Date();d.setDate(d.getDate()-i);days.add(day(d))}if(DDAY){days.clear();days.add(DDAY)}
   const per=el('div',{class:'filters'},el('h2',{text:'Dashboard da gestão'}),el('span',{class:'spacer'}));
-  [[1,'Hoje'],[7,'7 dias'],[30,'30 dias']].forEach(([n,l])=>{const b=el('button',{class:'chip',type:'button','aria-pressed':String(DP===n),text:l});b.onclick=()=>{DP=n;renderDash()};per.append(b)});v.append(per);
+  [[1,'Hoje'],[7,'7 dias'],[30,'30 dias']].forEach(([n,l])=>{const b=el('button',{class:'chip',type:'button','aria-pressed':String(DP===n&&!DDAY),text:l});b.onclick=()=>{DP=n;DDAY='';renderDash()};per.append(b)});const di=el('input',{type:'date',class:'chip',title:'Escolher um dia',max:today()});di.value=DDAY||'';di.onchange=()=>{DDAY=di.value;if(DDAY)DP=1;renderDash()};per.append(di);v.append(per);
   const names=[...TEAM(),'Robô','Sem responsável'];const R=Object.fromEntries(names.map(n=>[n,{n,lead:0,ctp:0,wg:0,vis:0,orc:0,won:0,due:0,ct:0}]));
   LEADS.forEach(d=>{const os=owners(d);const r=os.length===1&&R[os[0]]?R[os[0]]:R['Sem responsável'];r.lead++;const s=st(d);if(s!=='Não contatado')r.ct++;if(s==='Visita agendada')r.vis++;if(['Orçamento enviado','Negociando'].includes(s))r.orc++;if(s==='Fechado')r.won++;if(isDue(d))r.due++;
     if(d.wgby&&days.has(d.wgday)&&R[d.wgby])R[d.wgby].wg++});
@@ -508,10 +529,11 @@ function renderDash(){const v=$('#vDash');v.replaceChildren();const days=new Set
     .forEach(([x,l],i)=>k.append(el('div',{class:'kpi goal'+(i===5&&x?' alert':'')},el('b',{text:typeof x==='number'?x.toLocaleString('pt-BR'):x}),el('span',{text:l}))));v.append(k);
   const t=el('table',{class:'t'});t.append(el('tr',{},['Vendedor','Leads','Contatos','Meta ('+META+'/dia útil)','WhatsApps','Visitas','Orçam./negoc.','Fechados','Vencidos','Contatados'].map(h=>el('th',{text:h}))));
   Object.values(R).forEach(r=>{if(r.n==='Sem responsável'&&!r.lead)return;if(r.n==='Robô'&&!r.ctp)return;const pct=(r.n==='Sem responsável'||r.n==='Robô')?null:Math.round(r.ctp/meta*100);
-    t.append(el('tr',{},el('td',{},el('b',{text:r.n==='Sem responsável'?'Sem dono / livres':r.n})),el('td',{text:r.lead}),el('td',{text:r.ctp}),el('td',{},pct==null?'—':el('span',{class:'pill '+(pct>=100?'ok':pct>=60?'warn':'bad'),text:pct+'%'})),
+    t.append(el('tr',{},el('td',{},(()=>{const lb=r.n==='Sem responsável'?'Sem dono / livres':r.n;const b=el('button',{type:'button',class:'chip','aria-pressed':String(DV===r.n),title:'Clique para ver o que fez no período',text:lb+' ›'});b.onclick=()=>{DV=DV===r.n?null:r.n;renderDash();setTimeout(()=>{const x=document.getElementById('dvDet');if(x)x.scrollIntoView({behavior:'smooth'})},60)};return b})()),el('td',{text:r.lead}),el('td',{text:r.ctp}),el('td',{},pct==null?'—':el('span',{class:'pill '+(pct>=100?'ok':pct>=60?'warn':'bad'),text:pct+'%'})),
       el('td',{text:r.wg}),el('td',{text:r.vis}),el('td',{text:r.orc}),el('td',{text:r.won}),el('td',{},r.due?el('span',{class:'pill bad',text:r.due}):'0'),el('td',{text:r.lead?Math.round(r.ct/r.lead*100)+'%':'—'})))});
   t.append(el('tr',{class:'tot'},['Total',T.lead,T.ctp,'',T.wg,T.vis,T.orc,T.won,T.due,LEADS.length?Math.round(T.ct/LEADS.length*100)+'%':'—'].map(x=>el('td',{text:String(x)}))));
-  v.append(el('section',{class:'card'},el('h3',{text:'Por vendedor · '+(DP===1?'hoje':'últimos '+DP+' dias')}),el('div',{class:'scroll'},t),el('p',{class:'sub',style:'margin:0',text:'Contatos vêm da aba Atividade (um por lead por dia). Visitas, orçamentos e fechados mostram a situação atual dos leads de cada vendedor.'})));
+  v.append(el('section',{class:'card'},el('h3',{text:'Por vendedor · '+PLBL()+' — clique no nome para ver o detalhe'}),el('div',{class:'scroll'},t),el('p',{class:'sub',style:'margin:0',text:'Contatos vêm da aba Atividade (um por lead por dia). Visitas, orçamentos e fechados mostram a situação atual dos leads de cada vendedor.'})));
+  DVsec(v,R,days);
   const d14=[];for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);d14.push(day(d))}const bd=Object.fromEntries(d14.map(x=>[x,0]));ACT.forEach(a=>{if(a.acao==='Contato'&&a.day in bd)bd[a.day]++});const mx=Math.max(1,...Object.values(bd));
   const dd=el('div',{class:'days'});d14.forEach(x=>dd.append(el('div',{class:'d'},el('i',{style:'height:'+Math.round(bd[x]/mx*100)+'%'}),el('b',{text:String(bd[x])}),el('span',{text:x.slice(8)+'/'+x.slice(5,7)}))));
   const fun=el('div',{style:'display:grid;gap:6px'});const cnt={};LEADS.forEach(d=>{const s=st(d);cnt[s]=(cnt[s]||0)+1});const fm=Math.max(1,...STS.slice(1).map(s=>cnt[s]||0));
